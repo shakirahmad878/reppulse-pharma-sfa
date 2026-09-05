@@ -1,0 +1,160 @@
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  REGIONAL_MANAGER
+  AREA_MANAGER
+  MEDICAL_REP
+}
+
+enum DoctorTier {
+  A_PLUS
+  A
+  B
+  C
+}
+
+model User {
+  id                String                 @id @default(uuid())
+  email             String                 @unique
+  passwordHash      String
+  name              String
+  phone             String?
+  role              UserRole               @default(MEDICAL_REP)
+  employeeCode      String                 @unique
+  territoryId       String?
+  territory         Territory?             @relation(fields: [territoryId], references: [id])
+  isActive          Boolean                @default(true)
+  locationLogs      EmployeeLocationLog[]
+  dcrs              DCRRecord[]
+  tourPlans         TourPlan[]
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([role])
+}
+
+model Territory {
+  id           String      @id @default(uuid())
+  code         String      @unique
+  name         String
+  zone         String
+  state        String
+  headquarter  String
+  users        User[]
+  doctors      Doctor[]
+  chemists     Chemist[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Doctor {
+  id                   String                 @id @default(uuid())
+  name                 String
+  qualification        String
+  specialty            String
+  tier                 DoctorTier             @default(A)
+  clinicName           String
+  latitude             Float
+  longitude            Float
+  geofenceRadiusMeters Int                    @default(100)
+  territoryId          String
+  territory            Territory              @relation(fields: [territoryId], references: [id])
+  phone                String?
+  visitingHours        String?
+  potentialScore       Int                    @default(80)
+  monthlyVisitTarget   Int                    @default(2)
+  dcrs                 DCRRecord[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@index([specialty, tier])
+}
+
+model Chemist {
+  id                 String     @id @default(uuid())
+  shopName           String
+  contactPerson      String?
+  drugLicenseNumber  String
+  gstNumber          String?
+  latitude           Float
+  longitude          Float
+  territoryId        String
+  territory          Territory  @relation(fields: [territoryId], references: [id])
+  phone              String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  brandName   String
+  genericName String
+  category    String
+  dosageForm  String
+  packSize    String
+  mrp         Decimal  @db.Decimal(10, 2)
+  ptr         Decimal  @db.Decimal(10, 2)
+  pts         Decimal  @db.Decimal(10, 2)
+  indication  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EmployeeLocationLog {
+  id                 BigInt   @id @default(autoincrement())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id])
+  latitude           Float
+  longitude          Float
+  accuracyMeters     Float
+  speedKmh           Float
+  batteryPercentage  Int
+  isMockLocation     Boolean  @default(false)
+  isCharging         Boolean  @default(false)
+  capturedAt         DateTime
+  createdAt          DateTime @default(now())
+
+  @@index([userId, capturedAt])
+}
+
+model DCRRecord {
+  id                      String    @id @default(uuid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id])
+  date                    DateTime  @db.Date
+  doctorId                String?
+  doctor                  Doctor?   @relation(fields: [doctorId], references: [id])
+  checkInTime             DateTime
+  checkOutTime            DateTime?
+  checkInLat              Float
+  checkInLng              Float
+  isGeofenceVerified      Boolean   @default(false)
+  distanceFromClinicMeters Float?
+  doctorFeedback          String?
+  pobAmount               Decimal?  @db.Decimal(10, 2)
+  status                  String    @default("SUBMITTED")
+  createdAt               DateTime  @default(now())
+
+  @@index([userId, date])
+}
+
+model TourPlan {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  month       Int
+  year        Int
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

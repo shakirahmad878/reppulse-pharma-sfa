@@ -1,151 +1,268 @@
 import React, { useState } from 'react';
-import { PMTopBar } from './components/PMTopBar';
-import { PMHeader } from './components/PMHeader';
-import { PMHeroSlider } from './components/PMHeroSlider';
-import { PMCategoryShowcase } from './components/PMCategoryShowcase';
-import { PMProductCatalog } from './components/PMProductCatalog';
-import { PMAboutSection } from './components/PMAboutSection';
-import { PMFlipbook } from './components/PMFlipbook';
-import { PMEnquiryForm } from './components/PMEnquiryForm';
-import { PMContactSection } from './components/PMContactSection';
-import { PMFooter } from './components/PMFooter';
-import { PMProductModal } from './components/PMProductModal';
-import { PMSendEnquiryModal } from './components/PMSendEnquiryModal';
-import { PMSidebarNav } from './components/PMSidebarNav';
-import { PRODUCTS } from './data/products';
-import { Product, ProductCategory } from './types';
+import { 
+  User, 
+  UserRole, 
+  Doctor, 
+  Chemist, 
+  Product, 
+  LocationTelemetryPoint, 
+  DCRRecord, 
+  TourPlanItem 
+} from './types';
+import { 
+  INITIAL_USERS, 
+  INITIAL_DOCTORS, 
+  INITIAL_CHEMISTS, 
+  INITIAL_PRODUCTS, 
+  INITIAL_TERRITORIES, 
+  INITIAL_TELEMETRY_LOGS, 
+  INITIAL_DCR_LOGS 
+} from './data/mockData';
+import { AuthService } from './services/authService';
+import { TelemetryService } from './services/telemetryService';
+import { Navbar } from './components/layout/Navbar';
+import { Sidebar, NavTab } from './components/layout/Sidebar';
+import { ExecutiveDashboard } from './components/dashboard/ExecutiveDashboard';
+import { LiveFleetMap } from './components/maps/LiveFleetMap';
+import { DoctorDirectory } from './components/doctors/DoctorDirectory';
+import { ChemistDirectory } from './components/chemists/ChemistDirectory';
+import { ProductCatalog } from './components/products/ProductCatalog';
+import { TerritoryStaffView } from './components/territory/TerritoryStaffView';
+import { DCRView } from './components/dcr/DCRView';
+import { TourPlanner } from './components/tour/TourPlanner';
+import { POBOrderBooking } from './components/orders/POBOrderBooking';
+import { RCPAAuditView } from './components/rcpa/RCPAAuditView';
+import { GeoAttendanceView } from './components/hrms/GeoAttendanceView';
+import { ExpenseClaimsView } from './components/expenses/ExpenseClaimsView';
+import { MISReportsView } from './components/reports/MISReportsView';
+import { GuidedDemoModal } from './components/demo/GuidedDemoModal';
 
-export function App() {
-  const [activeSection, setActiveSection] = useState<string>('home');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isEnquiryModalOpen, setIsEnquiryModalOpen] = useState<boolean>(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
-  const [enquiryProductName, setEnquiryProductName] = useState<string>(PRODUCTS[0].name);
-  const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'All Products'>('All Products');
+export default function App() {
+  const [currentUser, setCurrentUser] = useState<User>(() => AuthService.getCurrentUser());
+  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [isDemoTourOpen, setIsDemoTourOpen] = useState(false);
+  
+  // Master Data State
+  const [doctors, setDoctors] = useState<Doctor[]>(INITIAL_DOCTORS);
+  const [chemists] = useState<Chemist[]>(INITIAL_CHEMISTS);
+  const [products] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [telemetryLogs, setTelemetryLogs] = useState<LocationTelemetryPoint[]>(INITIAL_TELEMETRY_LOGS);
+  const [dcrLogs, setDcrLogs] = useState<DCRRecord[]>(INITIAL_DCR_LOGS);
 
-  const handleNavigate = (sectionId: string) => {
-    setActiveSection(sectionId);
-    if (sectionId === 'home') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      const el = document.getElementById(sectionId);
-      if (el) {
-        const offset = 80;
-        const bodyRect = document.body.getBoundingClientRect().top;
-        const elementRect = el.getBoundingClientRect().top;
-        const elementPosition = elementRect - bodyRect;
-        const offsetPosition = elementPosition - offset;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        });
-      }
+  // Tour Plans State
+  const [tourPlans, setTourPlans] = useState<TourPlanItem[]>([
+    {
+      id: 'tp-01',
+      userId: 'usr-mr-01',
+      userName: 'Vikram Mehta',
+      date: '2026-09-08',
+      territoryId: 'terr-mum-west',
+      territoryName: 'Mumbai West & Bandra',
+      routeTitle: 'Bandra Linking Road Cardiac Focus',
+      plannedDoctorsCount: 2,
+      plannedChemistsCount: 1,
+      doctorIds: ['doc-01', 'doc-02'],
+      chemistIds: ['chem-01'],
+      status: 'APPROVED',
+      approvalComments: 'Approved by ASM Dr. Amitav Ghosh. Focus on CardioVast.',
     }
+  ]);
+  
+  const [isSimulatingPing, setIsSimulatingPing] = useState(false);
+
+  // Switch role handler for testing RBAC
+  const handleRoleChange = (newRole: UserRole) => {
+    const updated = AuthService.switchRole(newRole);
+    setCurrentUser(updated);
   };
 
-  const handleOpenEnquiryModal = (productName?: string) => {
-    setEnquiryProductName(productName || PRODUCTS[0].name);
-    setIsEnquiryModalOpen(true);
+  // Add new doctor handler
+  const handleAddDoctor = (newDoc: Doctor) => {
+    setDoctors(prev => [newDoc, ...prev]);
   };
 
-  const handleSelectProduct = (product: Product) => {
-    setSelectedProduct(product);
+  // Add new DCR handler
+  const handleAddDCR = (newDcr: DCRRecord) => {
+    setDcrLogs(prev => [newDcr, ...prev]);
+  };
+
+  // Add new Tour Plan
+  const handleAddTourPlan = (newPlan: TourPlanItem) => {
+    setTourPlans(prev => [newPlan, ...prev]);
+  };
+
+  // Tour plan status update
+  const handleUpdateTourPlanStatus = (id: string, newStatus: 'APPROVED' | 'REJECTED', comments?: string) => {
+    setTourPlans(prev => prev.map(tp => tp.id === id ? { ...tp, status: newStatus, approvalComments: comments } : tp));
+  };
+
+  // 15-Minute Background Telemetry Simulator
+  const handleTriggerTelemetryPing = () => {
+    setIsSimulatingPing(true);
+    setTimeout(() => {
+      const nextLat = 19.0548 + (Math.random() - 0.5) * 0.0004;
+      const nextLng = 72.8312 + (Math.random() - 0.5) * 0.0004;
+      
+      const newPoint = TelemetryService.ingest15MinPing({
+        userId: 'usr-mr-01',
+        userName: 'Vikram Mehta (MR)',
+        userRole: 'MEDICAL_REP',
+        territoryName: 'Mumbai West & Bandra',
+        latitude: nextLat,
+        longitude: nextLng,
+        accuracyMeters: 5.5,
+        speedKmh: Math.floor(Math.random() * 5),
+        batteryPercentage: Math.max(10, (telemetryLogs[telemetryLogs.length - 1]?.batteryPercentage || 90) - 1),
+        isMockLocation: false,
+        isCharging: false,
+      });
+
+      setTelemetryLogs(prev => [...prev, newPoint]);
+      setIsSimulatingPing(false);
+    }, 600);
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 flex flex-col justify-between selection:bg-[#c72828] selection:text-white font-sans antialiased">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       
-      {/* 1. Regulatory Top Bar */}
-      <PMTopBar onOpenEnquiry={() => handleOpenEnquiryModal()} />
-
-      {/* 2. Corporate Header with Horizontal Tabs & Sidebar Navigation Trigger */}
-      <PMHeader
-        activeSection={activeSection}
-        onNavigate={handleNavigate}
-        onSelectProduct={handleSelectProduct}
-        onOpenEnquiry={handleOpenEnquiryModal}
-        onOpenSidebar={() => setIsSidebarOpen(true)}
+      {/* Top Navigation Bar */}
+      <Navbar
+        currentUser={currentUser}
+        onRoleChange={handleRoleChange}
+        isSimulatingTelemetry={isSimulatingPing}
+        onTriggerTelemetryPing={handleTriggerTelemetryPing}
+        onOpenDemoTour={() => setIsDemoTourOpen(true)}
       />
 
-      {/* Main Content Sections */}
-      <main className="flex-grow">
+      {/* Main Workspace Layout */}
+      <div className="flex-1 flex max-w-7xl w-full mx-auto">
         
-        {/* 3. Hero Showcase Slider */}
-        <section id="home">
-          <PMHeroSlider
-            onSelectProduct={handleSelectProduct}
-            onOpenEnquiry={handleOpenEnquiryModal}
-            onNavigate={handleNavigate}
-          />
-        </section>
-
-        {/* 4. Product Categories Showcase */}
-        <PMCategoryShowcase
-          onSelectCategory={(cat) => setSelectedCategory(cat)}
-          onNavigate={handleNavigate}
+        {/* Left Navigation Sidebar */}
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          userRole={currentUser.role}
         />
 
-        {/* 5. Full Product Catalog Directory */}
-        <PMProductCatalog
-          selectedCategory={selectedCategory}
-          onSelectCategory={(cat) => setSelectedCategory(cat)}
-          onSelectProduct={handleSelectProduct}
-          onOpenEnquiry={handleOpenEnquiryModal}
-        />
+        {/* Dynamic Main Content Area */}
+        <main className="flex-1 p-6 overflow-y-auto max-w-5xl">
+          {activeTab === 'dashboard' && (
+            <ExecutiveDashboard
+              doctors={doctors}
+              chemists={chemists}
+              products={products}
+              telemetryLogs={telemetryLogs}
+              dcrLogs={dcrLogs}
+              userRole={currentUser.role}
+              onNavigateToTab={setActiveTab}
+            />
+          )}
 
-        {/* 6. Official About Us & Factsheet Section */}
-        <PMAboutSection
-          onOpenEnquiry={() => handleOpenEnquiryModal()}
-          onNavigate={handleNavigate}
-        />
+          {activeTab === 'fleet_tracking' && (
+            <LiveFleetMap
+              userRole={currentUser.role}
+              telemetryLogs={telemetryLogs}
+            />
+          )}
 
-        {/* 7. Clinical Flipbook / Visual Aid Viewer */}
-        <PMFlipbook
-          onOpenEnquiry={handleOpenEnquiryModal}
-          onSelectProduct={handleSelectProduct}
-        />
+          {activeTab === 'dcr' && (
+            <DCRView
+              dcrLogs={dcrLogs}
+              doctors={doctors}
+              products={products}
+              currentUser={currentUser}
+              onAddDCR={handleAddDCR}
+            />
+          )}
 
-        {/* 8. Dedicated MOQ Requirement & Wholesale Enquiry Form */}
-        <PMEnquiryForm defaultProduct={enquiryProductName} />
+          {activeTab === 'tour_plans' && (
+            <TourPlanner
+              tourPlans={tourPlans}
+              doctors={doctors}
+              chemists={chemists}
+              currentUser={currentUser}
+              onAddTourPlan={handleAddTourPlan}
+              onUpdateStatus={handleUpdateTourPlanStatus}
+            />
+          )}
 
-        {/* 9. Contact Details, Regional Depot & Map */}
-        <PMContactSection />
+          {activeTab === 'orders' && (
+            <POBOrderBooking
+              products={products}
+              chemists={chemists}
+              currentUser={currentUser}
+            />
+          )}
 
-      </main>
+          {activeTab === 'rcpa' && (
+            <RCPAAuditView
+              doctors={doctors}
+              chemists={chemists}
+            />
+          )}
 
-      {/* 10. Footer */}
-      <PMFooter
-        onNavigate={handleNavigate}
-        onSelectCategory={(cat) => setSelectedCategory(cat)}
-      />
+          {activeTab === 'attendance' && (
+            <GeoAttendanceView
+              currentUser={currentUser}
+            />
+          )}
 
-      {/* Full-Featured Sidebar Navigation Modal (Matching the uploaded reference style) */}
-      <PMSidebarNav
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        activeSection={activeSection}
-        onNavigate={handleNavigate}
-        onSelectCategory={(cat) => setSelectedCategory(cat)}
-        onOpenEnquiry={() => handleOpenEnquiryModal()}
-      />
+          {activeTab === 'expenses' && (
+            <ExpenseClaimsView
+              currentUser={currentUser}
+            />
+          )}
 
-      {/* Product Detail Modal */}
-      <PMProductModal
-        product={selectedProduct}
-        onClose={() => setSelectedProduct(null)}
-        onOpenEnquiry={handleOpenEnquiryModal}
-      />
+          {activeTab === 'mis_reports' && (
+            <MISReportsView
+              doctors={doctors}
+              chemists={chemists}
+              products={products}
+              dcrLogs={dcrLogs}
+            />
+          )}
 
-      {/* Instant MOQ Enquiry Modal */}
-      <PMSendEnquiryModal
-        isOpen={isEnquiryModalOpen}
-        onClose={() => setIsEnquiryModalOpen(false)}
-        defaultProductName={enquiryProductName}
+          {activeTab === 'doctors' && (
+            <DoctorDirectory
+              doctors={doctors}
+              onAddDoctor={handleAddDoctor}
+            />
+          )}
+
+          {activeTab === 'chemists' && (
+            <ChemistDirectory
+              chemists={chemists}
+            />
+          )}
+
+          {activeTab === 'products' && (
+            <ProductCatalog
+              products={products}
+            />
+          )}
+
+          {activeTab === 'territories' && (
+            <TerritoryStaffView
+              territories={INITIAL_TERRITORIES}
+              users={INITIAL_USERS}
+            />
+          )}
+        </main>
+
+      </div>
+
+      {/* Interactive Guided Demo Simulator Modal */}
+      <GuidedDemoModal
+        isOpen={isDemoTourOpen}
+        onClose={() => setIsDemoTourOpen(false)}
+        onNavigateTab={(tab) => {
+          if (tab === 'live-tracking' || tab === 'fleet_tracking') setActiveTab('fleet_tracking');
+          else if (tab === 'tour_plans' || tab === 'tour') setActiveTab('tour_plans');
+          else setActiveTab(tab as any);
+        }}
+        onSetRole={(role) => handleRoleChange(role)}
       />
 
     </div>
   );
 }
-
-export default App;

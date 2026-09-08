@@ -125,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab, userRo
 
       {/* Footer Info */}
       <div className="p-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-        <span>SefMed Enterprise</span>
+        <span>RepPulse Enterprise</span>
         <span className="text-teal-400 font-mono">Phase 4</span>
       </div>
     </aside>

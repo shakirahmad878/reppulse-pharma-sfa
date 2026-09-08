@@ -48,12 +48,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-base tracking-tight text-white">SefMed Pro</span>
+              <span className="font-bold text-base tracking-tight text-white">RepPulse</span>
               <span className="text-[10px] uppercase font-bold tracking-widest bg-teal-500/20 text-teal-300 px-1.5 py-0.5 rounded border border-teal-500/30">
                 Enterprise SFA
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 hidden sm:block">Pharma Sales Force Automation & Location Intelligence</p>
+            <p className="text-[11px] text-slate-400 hidden sm:block">Intelligent Pharma SFA • Barak Division (Assam)</p>
           </div>
         </div>
 

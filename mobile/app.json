@@ -60,7 +60,8 @@
         {
           "cameraPermission": "Allow RepPulse to capture geotagged selfie attendance punch-ins."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

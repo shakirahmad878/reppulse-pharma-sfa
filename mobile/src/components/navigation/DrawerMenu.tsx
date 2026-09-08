@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius } from '../../constants/theme';
 import { UserProfile } from '../../types';
 
@@ -24,6 +25,12 @@ interface DrawerMenuProps {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = SCREEN_WIDTH * 0.78;
 
+interface MenuItem {
+  key: string;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}
+
 export const DrawerMenu: React.FC<DrawerMenuProps> = ({
   visible,
   user,
@@ -32,18 +39,18 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({
   onNavigate,
   onLogout,
 }) => {
-  const menuItems = [
-    { key: 'DASHBOARD', label: 'Home', icon: '??' },
-    { key: 'VISIT_EXECUTION_LIST', label: 'Visits', icon: '??' },
-    { key: 'DOCTORS', label: 'Clients', icon: '??' },
-    { key: 'ROUTES', label: 'Calendar & Route Plan', icon: '??' },
-    { key: 'SYNC', label: 'Synchronize', icon: '??' },
-    { key: 'NOTIFICATIONS', label: 'Notification', icon: '??' },
-    { key: 'EXPENSES', label: 'Expenses', icon: '?' },
-    { key: 'LEAVES', label: 'Leaves', icon: '??' },
-    { key: 'FILES', label: 'Files', icon: '??' },
-    { key: 'COMMANDS', label: 'Commands', icon: '{ }' },
-    { key: 'PROFILE', label: 'My Info', icon: '??' },
+  const menuItems: MenuItem[] = [
+    { key: 'DASHBOARD', label: 'Home', icon: 'home-outline' },
+    { key: 'VISIT_EXECUTION_LIST', label: 'Visits', icon: 'medkit-outline' },
+    { key: 'DOCTORS', label: 'Clients', icon: 'people-outline' },
+    { key: 'ROUTES', label: 'Calendar & Route Plan', icon: 'calendar-outline' },
+    { key: 'SYNC', label: 'Synchronize', icon: 'cloud-upload-outline' },
+    { key: 'NOTIFICATIONS', label: 'Notification', icon: 'notifications-outline' },
+    { key: 'EXPENSES', label: 'Expenses', icon: 'receipt-outline' },
+    { key: 'LEAVES', label: 'Leaves', icon: 'airplane-outline' },
+    { key: 'FILES', label: 'Files', icon: 'folder-open-outline' },
+    { key: 'COMMANDS', label: 'Commands', icon: 'terminal-outline' },
+    { key: 'PROFILE', label: 'My Info', icon: 'person-outline' },
   ];
 
   const handleSelect = (key: string) => {
@@ -70,7 +77,10 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({
             <Text style={styles.userRole}>
               {user?.role === 'MEDICAL_REP' ? 'Medical Representative (MR)' : user?.role || 'Representative'}
             </Text>
-            <Text style={styles.userTerritory}>?? {user?.territory || 'Barak Division, Assam'}</Text>
+            <View style={styles.territoryRow}>
+              <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.9)" />
+              <Text style={styles.userTerritory}>{user?.territory || 'Barak Division, Assam'}</Text>
+            </View>
             <View style={styles.divider} />
           </View>
 
@@ -85,23 +95,32 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({
                   onPress={() => handleSelect(item.key)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.menuIcon}>{item.icon}</Text>
+                  <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
+                    <Ionicons
+                      name={item.icon}
+                      size={20}
+                      color={isActive ? colors.primary : '#1E3A8A'}
+                    />
+                  </View>
                   <Text style={[styles.menuText, isActive && styles.menuTextActive]}>
                     {item.label}
                   </Text>
+                  {isActive && <View style={styles.activeIndicator} />}
                 </TouchableOpacity>
               );
             })}
 
-            <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-              <Text style={styles.logoutIcon}>??</Text>
+            <TouchableOpacity style={styles.logoutButton} onPress={onLogout} activeOpacity={0.7}>
+              <View style={styles.logoutIconBox}>
+                <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+              </View>
               <Text style={styles.logoutText}>Log Out</Text>
             </TouchableOpacity>
           </ScrollView>
 
-          {/* Drawer Footer */}
+          {/* Footer Version Tag */}
           <View style={styles.footer}>
-            <Text style={styles.versionText}>RepPulse v1.0.0 (Barak Division)</Text>
+            <Text style={styles.footerText}>RepPulse v1.2.0 (Barak Division)</Text>
           </View>
         </View>
       </View>
@@ -113,115 +132,148 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
   },
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
   },
   drawerContainer: {
     width: DRAWER_WIDTH,
     height: '100%',
-    backgroundColor: '#93C5FD', // Light sky-blue matching Screenshot 2
-    paddingTop: 44,
-    paddingHorizontal: spacing.lg,
-    display: 'flex',
+    backgroundColor: '#93C5FD',
+    zIndex: 99999,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
   },
   profileHeader: {
-    marginBottom: spacing.md,
+    paddingTop: 48,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    backgroundColor: '#93C5FD',
   },
   avatarCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#DBEAFE',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   avatarInitial: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.black,
+    fontSize: 26,
+    fontWeight: '900',
     color: '#1E3A8A',
   },
   userName: {
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: '#1E3A8A',
+    fontWeight: typography.fontWeight.black,
+    color: '#0F172A',
   },
   userRole: {
     fontSize: typography.fontSize.xs,
+    color: '#1E3A8A',
     fontWeight: typography.fontWeight.semibold,
-    color: '#1E40AF',
     marginTop: 2,
+  },
+  territoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
   },
   userTerritory: {
-    fontSize: typography.fontSize.xxs + 1,
-    color: '#1D4ED8',
-    marginTop: 2,
+    fontSize: 11,
+    color: '#1E3A8A',
+    fontWeight: typography.fontWeight.medium,
+    marginLeft: 4,
   },
   divider: {
-    height: 1.5,
-    backgroundColor: '#60A5FA',
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
     marginTop: spacing.md,
-    marginBottom: spacing.xs,
   },
   menuScroll: {
     flex: 1,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-    marginBottom: 2,
+    marginVertical: 2,
   },
   menuItemActive: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  menuIcon: {
-    fontSize: 18,
+  iconBox: {
     width: 32,
-    color: '#1E3A8A',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  iconBoxActive: {},
   menuText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
     color: '#1E3A8A',
+    marginLeft: spacing.sm,
+    flex: 1,
   },
   menuTextActive: {
-    fontWeight: typography.fontWeight.black,
     color: '#1D4ED8',
+    fontWeight: typography.fontWeight.bold,
+  },
+  activeIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#1D4ED8',
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
     marginTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: '#BFDBFE',
+    marginBottom: spacing.xxl,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(254, 226, 226, 0.7)',
   },
-  logoutIcon: {
-    fontSize: 18,
+  logoutIconBox: {
     width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoutText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.bold,
-    color: '#B91C1C',
+    color: '#DC2626',
+    marginLeft: spacing.sm,
   },
   footer: {
-    paddingVertical: spacing.md,
+    padding: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#BFDBFE',
+    borderTopColor: 'rgba(255, 255, 255, 0.3)',
     alignItems: 'center',
   },
-  versionText: {
-    fontSize: typography.fontSize.xxs,
+  footerText: {
+    fontSize: 10,
     color: '#1E3A8A',
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

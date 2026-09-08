@@ -142,4 +142,16 @@ export class RouteService {
     await StorageService.setItem(ROUTE_REQUESTS_KEY, requests);
     return true;
   }
+
+  public static async getRouteRequests(): Promise<RouteChangeRequest[]> {
+    return this.getRouteChangeRequests();
+  }
+
+  public static async approveRouteRequest(requestId: string, comment?: string): Promise<boolean> {
+    return this.adminReviewRequest(requestId, true, comment);
+  }
+
+  public static async rejectRouteRequest(requestId: string, comment?: string): Promise<boolean> {
+    return this.adminReviewRequest(requestId, false, comment);
+  }
 }

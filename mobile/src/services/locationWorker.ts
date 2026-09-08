@@ -2,7 +2,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const BACKGROUND_LOCATION_TASK = 'SEFMED_BACKGROUND_15MIN_LOCATION_TASK';
+export const BACKGROUND_LOCATION_TASK = 'REPPULSE_BACKGROUND_15MIN_LOCATION_TASK';
 
 // Register Background Location Task
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
@@ -60,7 +60,7 @@ export class MobileLocationManager {
         distanceInterval: 50,         // 50 meters displacement
         showsBackgroundLocationIndicator: true,
         foregroundService: {
-          notificationTitle: 'SefMed Active Duty',
+          notificationTitle: 'RepPulse Active Duty',
           notificationBody: 'Logging 15-minute background compliance coordinates.',
           notificationColor: '#0F172A'
         }

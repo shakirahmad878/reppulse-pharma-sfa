@@ -1,85 +1,107 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
-import { colors, typography, spacing, radius } from '../../constants/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, typography, spacing } from '../../constants/theme';
 import { Header } from '../../components/common/Header';
+import { Card } from '../../components/common/Card';
 
 interface AuxScreenProps {
-  title: string;
-  subtitle: string;
+  title?: string;
+  subtitle?: string;
   onBack: () => void;
-  type: 'EXPENSES' | 'LEAVES' | 'FILES' | 'NOTIFICATIONS';
+  type?: 'NOTIFICATIONS' | 'EXPENSES' | 'LEAVES' | 'FILES';
 }
 
-export const AuxScreen: React.FC<AuxScreenProps> = ({ title, subtitle, onBack, type }) => {
-  return (
-    <SafeAreaView style={styles.container}>
-      <Header title={title} subtitle={subtitle} showBack onBack={onBack} />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        {type === 'EXPENSES' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Daily Travel & Daily Allowance (TA/DA)</Text>
-            <Text style={styles.cardDesc}>
-              Barak Division HQ Silchar: ?450/day. Outstation (Karimganj / Hailakandi): ?750/day.
-            </Text>
-            <View style={styles.itemRow}>
-              <Text style={styles.itemText}>Silchar Central Route Travel</Text>
-              <Text style={styles.itemVal}>?450.00 (Approved)</Text>
-            </View>
-          </View>
-        )}
-
-        {type === 'LEAVES' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Leave Balance & Approvals</Text>
-            <Text style={styles.cardDesc}>Casual Leaves: 8 remaining | Sick Leaves: 6 remaining.</Text>
-            <View style={styles.itemRow}>
-              <Text style={styles.itemText}>Last Leave: 12 Aug 2026</Text>
-              <Text style={styles.itemVal}>Approved</Text>
-            </View>
-          </View>
-        )}
-
-        {type === 'FILES' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Product Literature & Visual Aids</Text>
-            <Text style={styles.cardDesc}>Downloadable e-detailing flipcharts and clinical study brochures.</Text>
-            <View style={styles.itemRow}>
-              <Text style={styles.itemText}>?? CardioPulse-AM Visual Aid.pdf</Text>
-              <Text style={styles.itemVal}>4.2 MB</Text>
-            </View>
-            <View style={styles.itemRow}>
-              <Text style={styles.itemText}>?? CefoPulse Clinical Efficacy Study.pdf</Text>
-              <Text style={styles.itemVal}>6.8 MB</Text>
-            </View>
-          </View>
-        )}
-
-        {type === 'NOTIFICATIONS' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Field Broadcasts</Text>
-            <View style={styles.itemRow}>
-              <Text style={styles.itemText}>?? New Incentive Scheme Active for Barak Valley</Text>
-              <Text style={styles.itemVal}>Today</Text>
-            </View>
-            <View style={styles.itemRow}>
-              <Text style={styles.itemText}>?? Telemetry sync verified by Indore HQ</Text>
-              <Text style={styles.itemVal}>Yesterday</Text>
-            </View>
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
-  );
+export const AuxScreen: React.FC<AuxScreenProps> = ({ title, subtitle, onBack, type = 'EXPENSES' }) => {
+  if (type === 'NOTIFICATIONS') return <NotificationsScreen onBack={onBack} />;
+  if (type === 'LEAVES') return <LeavesScreen onBack={onBack} />;
+  if (type === 'FILES') return <FilesScreen onBack={onBack} />;
+  return <ExpensesScreen onBack={onBack} />;
 };
 
+export const NotificationsScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => (
+  <SafeAreaView style={styles.container}>
+    <Header title="Notifications" subtitle="HQ Broadcasts & Circulars" showBack onBack={onBack} />
+    <ScrollView contentContainerStyle={styles.content}>
+      <Card>
+        <View style={styles.itemRow}>
+          <Ionicons name="megaphone-outline" size={20} color="#2563EB" />
+          <Text style={styles.itemText}>New Incentive Scheme Active for Barak Valley</Text>
+        </View>
+        <Text style={styles.itemSub}>Special Q3 rewards on CardioPulse & CefoPulse-CV prescriptions in Silchar, Hailakandi & Karimganj.</Text>
+      </Card>
+      <Card>
+        <View style={styles.itemRow}>
+          <Ionicons name="checkmark-circle-outline" size={20} color="#16A34A" />
+          <Text style={styles.itemText}>Telemetry sync verified by Assam Regional HQ</Text>
+        </View>
+        <Text style={styles.itemSub}>All 15-minute background location points logged successfully.</Text>
+      </Card>
+    </ScrollView>
+  </SafeAreaView>
+);
+
+export const ExpensesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => (
+  <SafeAreaView style={styles.container}>
+    <Header title="Daily Allowances & TA/DA" subtitle="Barak Division Field Expenses" showBack onBack={onBack} />
+    <ScrollView contentContainerStyle={styles.content}>
+      <Card>
+        <Text style={styles.sectionTitle}>Daily Allowance (DA) Structure</Text>
+        <Text style={styles.infoRow}>• HQ (Silchar Central Beat): ₹250 / day</Text>
+        <Text style={styles.infoRow}>• Ex-HQ (Karimganj / Hailakandi Beats): ₹450 / day</Text>
+        <Text style={styles.infoRow}>• Outstation (Badarpur / Lala / Patharkandi): ₹750 / day</Text>
+      </Card>
+      <Card>
+        <Text style={styles.sectionTitle}>Travel Allowance (TA) Policy</Text>
+        <Text style={styles.infoRow}>• Two-Wheeler Reimbursement: ₹4.50 / km</Text>
+        <Text style={styles.infoRow}>• Public Transit (Auto/Bus/Train): As per actual ticket bills</Text>
+      </Card>
+    </ScrollView>
+  </SafeAreaView>
+);
+
+export const LeavesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => (
+  <SafeAreaView style={styles.container}>
+    <Header title="Leave Management" subtitle="Apply & Track Field Leave" showBack onBack={onBack} />
+    <ScrollView contentContainerStyle={styles.content}>
+      <Card>
+        <Text style={styles.sectionTitle}>Leave Balance (Calendar Year 2026)</Text>
+        <Text style={styles.infoRow}>• Casual Leaves (CL): 8 Days Available</Text>
+        <Text style={styles.infoRow}>• Sick Leaves (SL): 6 Days Available</Text>
+        <Text style={styles.infoRow}>• Earned Leaves (EL): 14 Days Available</Text>
+      </Card>
+    </ScrollView>
+  </SafeAreaView>
+);
+
+export const FilesScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => (
+  <SafeAreaView style={styles.container}>
+    <Header title="e-Detailing & Visual Aids" subtitle="Product Literature & Flipcharts" showBack onBack={onBack} />
+    <ScrollView contentContainerStyle={styles.content}>
+      <Card>
+        <View style={styles.itemRow}>
+          <Ionicons name="document-attach-outline" size={20} color="#DC2626" />
+          <Text style={styles.itemText}>CardioPulse-AM Visual Aid (Barak Ed.).pdf</Text>
+        </View>
+        <Text style={styles.itemSub}>Interactive iPad/Mobile detailing aid with clinical trial data.</Text>
+      </Card>
+      <Card>
+        <View style={styles.itemRow}>
+          <Ionicons name="document-attach-outline" size={20} color="#DC2626" />
+          <Text style={styles.itemText}>CefoPulse-CV Clinical Efficacy Study.pdf</Text>
+        </View>
+        <Text style={styles.itemSub}>Peer-reviewed multi-center antibiotic trial results.</Text>
+      </Card>
+    </ScrollView>
+  </SafeAreaView>
+);
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  scroll: { flex: 1 },
+  container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg },
-  card: { backgroundColor: '#FFFFFF', borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: '#E2E8F0' },
-  cardTitle: { fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.bold, color: '#0F172A', marginBottom: 4 },
-  cardDesc: { fontSize: typography.fontSize.xs, color: '#64748B', marginBottom: spacing.md },
-  itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  itemText: { fontSize: typography.fontSize.xs, color: '#334155', fontWeight: typography.fontWeight.medium },
-  itemVal: { fontSize: typography.fontSize.xs, color: '#2563EB', fontWeight: typography.fontWeight.bold },
+  itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  itemText: { fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold, color: colors.textPrimary, marginLeft: spacing.xs },
+  itemSub: { fontSize: typography.fontSize.xs, color: colors.textSecondary, marginLeft: 28 },
+  sectionTitle: { fontSize: typography.fontSize.md, fontWeight: typography.fontWeight.bold, color: colors.textPrimary, marginBottom: spacing.sm },
+  infoRow: { fontSize: typography.fontSize.sm, color: colors.textSecondary, marginVertical: 3 },
 });

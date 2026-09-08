@@ -17,6 +17,8 @@ declare module 'react-native' {
   export const Dimensions: any;
   export const ToastAndroid: any;
   export const Platform: any;
+  export const Image: any;
+  export const ImageBackground: any;
   export const Linking: any;
   export type TextInputProps = any;
   export type ViewStyle = any;

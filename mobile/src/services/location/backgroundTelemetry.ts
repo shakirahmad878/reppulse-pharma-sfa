@@ -3,10 +3,10 @@ import * as TaskManager from 'expo-task-manager';
 import { StorageService, STORAGE_KEYS } from '../storageService';
 import { TelemetryLogPoint } from '../../types';
 
-export const SEFMED_TELEMETRY_TASK_NAME = 'SEFMED_BACKGROUND_15MIN_LOCATION_TASK';
+export const REPPULSE_TELEMETRY_TASK_NAME = 'REPPULSE_BACKGROUND_15MIN_LOCATION_TASK';
 
 // Register background location task handler
-TaskManager.defineTask(SEFMED_TELEMETRY_TASK_NAME, async ({ data, error }) => {
+TaskManager.defineTask(REPPULSE_TELEMETRY_TASK_NAME, async ({ data, error }) => {
   if (error) {
     console.error('[Telemetry Task] Execution Error:', error.message);
     return;
@@ -40,7 +40,7 @@ TaskManager.defineTask(SEFMED_TELEMETRY_TASK_NAME, async ({ data, error }) => {
 export class BackgroundTelemetryManager {
   public static async isRegistered(): Promise<boolean> {
     try {
-      return await TaskManager.isTaskRegisteredAsync(SEFMED_TELEMETRY_TASK_NAME);
+      return await TaskManager.isTaskRegisteredAsync(REPPULSE_TELEMETRY_TASK_NAME);
     } catch {
       return false;
     }
@@ -60,13 +60,13 @@ export class BackgroundTelemetryManager {
 
       const registered = await this.isRegistered();
       if (!registered) {
-        await Location.startLocationUpdatesAsync(SEFMED_TELEMETRY_TASK_NAME, {
+        await Location.startLocationUpdatesAsync(REPPULSE_TELEMETRY_TASK_NAME, {
           accuracy: Location.Accuracy.Balanced,
           timeInterval: 15 * 60 * 1000, // 15-minute interval
           distanceInterval: 50,         // 50m displacement
           showsBackgroundLocationIndicator: true,
           foregroundService: {
-            notificationTitle: 'SefMed Active Field Duty',
+            notificationTitle: 'RepPulse Active Field Duty',
             notificationBody: 'Recording periodic 15-minute compliance pings.',
             notificationColor: '#0D9488'
           }
@@ -83,7 +83,7 @@ export class BackgroundTelemetryManager {
     try {
       const registered = await this.isRegistered();
       if (registered) {
-        await Location.stopLocationUpdatesAsync(SEFMED_TELEMETRY_TASK_NAME);
+        await Location.stopLocationUpdatesAsync(REPPULSE_TELEMETRY_TASK_NAME);
       }
     } catch (err) {
       console.warn('[Telemetry Task] Failed to stop tracking:', err);

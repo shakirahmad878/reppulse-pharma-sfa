@@ -3,7 +3,7 @@
     "name": "RepPulse",
     "slug": "sefmed-pharma-sfa",
     "owner": "shakir878",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,14 +20,14 @@
           "location",
           "fetch"
         ],
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "SefMed captures periodic 15-minute background location pings during active field duty to verify doctor clinic visits.",
-        "NSLocationWhenInUseUsageDescription": "SefMed uses your location to verify arrival at doctor clinics and calculate travel allowance.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "RepPulse captures periodic 15-minute background location pings during active field duty to verify doctor clinic visits.",
+        "NSLocationWhenInUseUsageDescription": "RepPulse uses your location to verify arrival at doctor clinics and calculate travel allowance.",
         "NSCameraUsageDescription": "Required for geotagged selfie attendance punch-in and receipt uploads."
       }
     },
     "android": {
       "package": "com.reppulse.sfa",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F172A"

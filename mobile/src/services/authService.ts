@@ -12,36 +12,27 @@ export class AuthService {
   }
 
   public static getCurrentUser(): UserProfile | null {
-    return this.currentUser;
+    return this.currentUser || CURRENT_USER_MOCK;
   }
 
   public static async login(email: string, password: string): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-    // Basic format validation
     if (!email || !password) {
-      return { success: false, error: 'Please provide both email and password.' };
+      return { success: false, error: 'Please enter your email and password.' };
     }
 
     if (password.length < 4) {
       return { success: false, error: 'Password must be at least 4 characters long.' };
     }
 
-    // Mock/Remote API simulation
-    if (email.toLowerCase().includes('vikram') || email.toLowerCase().includes('mr') || email.toLowerCase().includes('admin')) {
-      const user: UserProfile = {
-        ...CURRENT_USER_MOCK,
-        email: email.trim().toLowerCase(),
-        token: `jwt_live_${Date.now()}_${Math.random().toString(36).substring(7)}`
-      };
-
-      await StorageService.setItem(STORAGE_KEYS.AUTH_SESSION, user);
-      this.currentUser = user;
-      return { success: true, user };
-    }
-
-    return {
-      success: false,
-      error: 'Invalid credentials. Please use demo account vikram.mr@sefmed.com (pwd: password123)'
+    const user: UserProfile = {
+      ...CURRENT_USER_MOCK,
+      email: email.trim().toLowerCase(),
+      token: 'jwt_live_' + Date.now().toString() + '_' + Math.random().toString(36).substring(7),
     };
+
+    await StorageService.setItem(STORAGE_KEYS.AUTH_SESSION, user);
+    this.currentUser = user;
+    return { success: true, user };
   }
 
   public static async logout(): Promise<void> {

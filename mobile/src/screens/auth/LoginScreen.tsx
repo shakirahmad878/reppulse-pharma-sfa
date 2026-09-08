@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { colors, typography, spacing, radius } from '../../constants/theme';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
@@ -11,7 +11,7 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onForgotPassword }) => {
-  const [email, setEmail] = useState('vikram.mr@sefmed.com');
+  const [email, setEmail] = useState('shakir.mr@reppulse.com');
   const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -38,8 +38,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onForg
           <View style={styles.logoBadge}>
             <Text style={styles.logoText}>💊</Text>
           </View>
-          <Text style={styles.appTitle}>SefMed Pro</Text>
-          <Text style={styles.appTagline}>Enterprise Pharma Sales Force Automation</Text>
+          <Text style={styles.appTitle}>RepPulse</Text>
+          <Text style={styles.appTagline}>Intelligent Pharma Sales Force Automation</Text>
+          <Text style={styles.territoryTag}>Barak Valley Division (Assam)</Text>
         </View>
 
         {/* Login Form Card */}
@@ -57,7 +58,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onForg
             label="Official Email ID"
             value={email}
             onChangeText={setEmail}
-            placeholder="e.g. vikram.mr@sefmed.com"
+            placeholder="e.g. shakir.mr@reppulse.com"
             keyboardType="email-address"
             autoCapitalize="none"
           />
@@ -82,8 +83,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onForg
           />
 
           <View style={styles.demoHelper}>
-            <Text style={styles.demoHelperTitle}>Demo Credentials Loaded:</Text>
-            <Text style={styles.demoHelperText}>Email: vikram.mr@sefmed.com</Text>
+            <Text style={styles.demoHelperTitle}>Default Field Representative Loaded:</Text>
+            <Text style={styles.demoHelperText}>Email: shakir.mr@reppulse.com</Text>
             <Text style={styles.demoHelperText}>Password: password123</Text>
           </View>
         </View>
@@ -95,33 +96,41 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onForg
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollContent: { padding: spacing.xl, justifyContent: 'center', minHeight: '100%' },
-  brandContainer: { alignItems: 'center', marginBottom: spacing.xxl },
+  brandContainer: { alignItems: 'center', marginBottom: spacing.xl },
   logoBadge: {
     width: 64,
     height: 64,
-    borderRadius: 16,
+    borderRadius: 20,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  logoText: { fontSize: 30 },
+  logoText: { fontSize: 32 },
   appTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSize.hero,
+    color: '#0F172A',
+    fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.black,
+    letterSpacing: -0.5,
   },
   appTagline: {
-    color: colors.textSecondary,
+    color: '#64748B',
     fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
     marginTop: 4,
+  },
+  territoryTag: {
+    color: colors.primaryDark,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    marginTop: 2,
   },
   formCard: {
     backgroundColor: colors.surface,
-    padding: spacing.xl,
     borderRadius: radius.xl,
+    padding: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderLight,
   },
   formTitle: {
     color: colors.textPrimary,
@@ -131,32 +140,28 @@ const styles = StyleSheet.create({
   formSub: {
     color: colors.textSecondary,
     fontSize: typography.fontSize.sm,
-    marginBottom: spacing.lg,
     marginTop: 2,
+    marginBottom: spacing.lg,
   },
   errorBox: {
-    backgroundColor: colors.dangerLight,
+    backgroundColor: '#FEE2E2',
     padding: spacing.md,
     borderRadius: radius.md,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.danger,
+    borderColor: '#FCA5A5',
   },
-  errorBoxText: {
-    color: colors.danger,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-  },
+  errorBoxText: { color: '#DC2626', fontSize: typography.fontSize.sm },
   forgotBtn: { alignSelf: 'flex-end', marginBottom: spacing.lg },
-  forgotText: { color: colors.primary, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold },
+  forgotText: { color: colors.primary, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold },
   demoHelper: {
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     padding: spacing.md,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: '#EFF6FF',
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: '#BFDBFE',
   },
   demoHelperTitle: { color: colors.primaryDark, fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold },
-  demoHelperText: { color: colors.primaryDark, fontSize: typography.fontSize.xs, marginTop: 2 },
+  demoHelperText: { color: colors.primary, fontSize: typography.fontSize.xs, marginTop: 2 },
 });

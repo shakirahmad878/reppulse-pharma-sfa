@@ -9,12 +9,13 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing, radius, shadows } from '../../constants/theme';
 import { AuthService } from '../../services/authService';
 import { RouteService } from '../../services/routeService';
 import { DoctorService } from '../../services/doctorService';
-import { OrderService } from '../../services/orderService';
 import { SyncService } from '../../services/sync/syncService';
+import { AttendanceService } from '../../services/attendanceService';
 import { BackgroundTelemetryManager } from '../../services/location/backgroundTelemetry';
 import { UserProfile, RoutePlan, MTPDayPlan } from '../../types';
 
@@ -30,8 +31,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [user, setUser] = useState<UserProfile | null>(AuthService.getCurrentUser());
   const [activeRoute, setActiveRoute] = useState<RoutePlan | null>(null);
   const [todayMTP, setTodayMTP] = useState<MTPDayPlan | null>(null);
-  const [isWorking, setIsWorking] = useState(true);
-  const [startTimeText, setStartTimeText] = useState('07:57 AM');
+  const [isWorking, setIsWorking] = useState(false);
+  const [punchInTime, setPunchInTime] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
@@ -42,6 +43,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     setActiveRoute(route);
     const mtpDay = await RouteService.getTodayMTPDay();
     setTodayMTP(mtpDay);
+
+    const att = await AttendanceService.getTodayAttendance();
+    setIsWorking(att.isPunchedIn);
+    setPunchInTime(att.punchInTime);
   };
 
   useEffect(() => {
@@ -54,7 +59,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     setRefreshing(false);
   };
 
-  const toggleDuty = async () => {
+  const handleDutyPress = async () => {
     if (isWorking) {
       Alert.alert(
         'Stop Field Duty?',
@@ -65,8 +70,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             text: 'Stop Working',
             style: 'destructive',
             onPress: async () => {
-              await BackgroundTelemetryManager.stopTracking();
+              await AttendanceService.punchOut();
               setIsWorking(false);
+              setPunchInTime(null);
             },
           },
         ]
@@ -98,305 +104,422 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             activeOpacity={0.6}
             hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
           >
-            <Text style={styles.hamburgerIcon}>☰</Text>
+            <View style={styles.hamburgerIconBox}>
+              <Ionicons name="menu" size={28} color="#FFFFFF" />
+            </View>
           </TouchableOpacity>
-          <Text style={styles.appTitle}>RepPulse</Text>
-          <View style={{ width: 44 }} />
+
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerAppName}>RepPulse</Text>
+            <Text style={styles.headerAppSub}>Barak Valley Division (Assam)</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={() => onNavigate('NOTIFICATIONS')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
 
-        {/* Central Circular Duty Status Card */}
-        <View style={styles.circularDutyWrapper} pointerEvents="box-none">
-          <View style={styles.outerRing}>
-            <View style={styles.innerCircle}>
-              <Text style={styles.dutyTimeText}>
-                {isWorking ? 'Since ' + startTimeText : 'Shift Offline'}
-              </Text>
-              <Text style={styles.dutyHqText} numberOfLines={1}>
-                {'📍 ' + (todayMTP ? todayMTP.routeName.split('-')[0].trim() : activeRoute ? activeRoute.name.split('-')[0].trim() : 'HQ - Silchar')}
-              </Text>
-              <TouchableOpacity
-                style={[styles.dutyToggleButton, !isWorking && styles.dutyToggleButtonStart]}
-                onPress={toggleDuty}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.dutyToggleText,
-                    !isWorking && styles.dutyToggleTextStart,
-                  ]}
-                >
-                  {isWorking ? 'Stop Working' : 'Start Working'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+        {/* Status Bar Pills */}
+        <View style={styles.statusBarRow}>
+          <View style={styles.statusPill}>
+            <View style={[styles.statusDot, isWorking ? styles.dotGreen : styles.dotAmber]} />
+            <Text style={styles.statusPillText}>
+              {isWorking ? 'Field Duty Active' : 'Duty Not Started'}
+            </Text>
           </View>
+
+          <View style={styles.statusPill}>
+            <Ionicons name="checkmark-done" size={14} color="#FFFFFF" />
+            <Text style={styles.statusPillText}>All Data Synced</Text>
+          </View>
+        </View>
+
+        {/* Central Circular Duty Status Dial */}
+        <View style={styles.dutyCircleContainer} pointerEvents="box-none">
+          <TouchableOpacity
+            style={[styles.dutyCircle, isWorking ? styles.dutyCircleActive : styles.dutyCircleInactive]}
+            onPress={handleDutyPress}
+            activeOpacity={0.85}
+          >
+            {isWorking ? (
+              <>
+                <Text style={styles.dutyTimeText}>Since {punchInTime || '08:00 AM'}</Text>
+                <View style={styles.dutyLocationRow}>
+                  <Ionicons name="location-sharp" size={13} color="#DC2626" />
+                  <Text style={styles.dutyLocationText} numberOfLines={1}>
+                    {activeRoute ? activeRoute.name : 'Silchar Central'}
+                  </Text>
+                </View>
+                <Text style={styles.dutyActionTextStop}>Stop Working</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="play-circle-outline" size={26} color="#2563EB" />
+                <Text style={styles.dutyActionTextStart}>Start Working</Text>
+                <Text style={styles.dutySubText}>Tap to Punch In</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Main Feature Tiles Grid (2 Columns, 6 Pastel Tiles) */}
+      {/* Main Content Area */}
       <ScrollView
-        style={styles.tilesScrollView}
-        contentContainerStyle={styles.tilesContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
-        }
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#3B82F6']} />
+        }
       >
-        <View style={styles.tilesGrid}>
-          {/* Tile 1: VISITS (Lavender) */}
+        {/* 6 Pastel Action Tiles Grid */}
+        <View style={styles.gridContainer}>
+          {/* Tile 1: VISITS (Soft Lilac) */}
           <TouchableOpacity
-            style={[styles.tileCard, { backgroundColor: colors.tileVisits }]}
+            style={[styles.tileCard, { backgroundColor: '#F3E8FF' }]}
+            onPress={() => onNavigate('VISIT_EXECUTION_LIST')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.tileIconCircle}>
+              <Ionicons name="document-text-outline" size={32} color="#7E22CE" />
+            </View>
+            <Text style={styles.tileLabel}>VISITS</Text>
+          </TouchableOpacity>
+
+          {/* Tile 2: CLIENTS / DOCTORS (Soft Pink) */}
+          <TouchableOpacity
+            style={[styles.tileCard, { backgroundColor: '#FCE7F3' }]}
             onPress={() => onNavigate('DOCTORS')}
-            activeOpacity={0.85}
+            activeOpacity={0.8}
           >
-            <View style={styles.tileIconContainer}>
-              <Text style={styles.tileEmoji}>📄</Text>
+            <View style={styles.tileIconCircle}>
+              <Ionicons name="people-outline" size={32} color="#BE185D" />
             </View>
-            <Text style={styles.tileTitle}>VISITS</Text>
+            <Text style={styles.tileLabel}>CLIENTS</Text>
           </TouchableOpacity>
 
-          {/* Tile 2: CLIENTS (Pink) */}
+          {/* Tile 3: FIRMS / STOCKISTS (Soft Mint Green) */}
           <TouchableOpacity
-            style={[styles.tileCard, { backgroundColor: colors.tileClients }]}
-            onPress={() => onNavigate('DOCTORS')}
-            activeOpacity={0.85}
+            style={[styles.tileCard, { backgroundColor: '#DCFCE7' }]}
+            onPress={() => onNavigate('ROUTES', { tab: 'FIRMS' })}
+            activeOpacity={0.8}
           >
-            <View style={styles.tileIconContainer}>
-              <Text style={styles.tileEmoji}>👥</Text>
+            <View style={styles.tileIconCircle}>
+              <Ionicons name="business-outline" size={32} color="#15803D" />
             </View>
-            <Text style={styles.tileTitle}>CLIENTS</Text>
+            <Text style={styles.tileLabel}>FIRMS</Text>
           </TouchableOpacity>
 
-          {/* Tile 3: FIRMS (Mint Green) */}
+          {/* Tile 4: HOSPITALS (Soft Lavender) */}
           <TouchableOpacity
-            style={[styles.tileCard, { backgroundColor: colors.tileFirms }]}
-            onPress={() => onNavigate('FIRMS')}
-            activeOpacity={0.85}
+            style={[styles.tileCard, { backgroundColor: '#EDE9FE' }]}
+            onPress={() => onNavigate('ROUTES', { tab: 'HOSPITALS' })}
+            activeOpacity={0.8}
           >
-            <View style={styles.tileIconContainer}>
-              <Text style={styles.tileEmoji}>🏢</Text>
+            <View style={styles.tileIconCircle}>
+              <Ionicons name="medical-outline" size={32} color="#6D28D9" />
             </View>
-            <Text style={styles.tileTitle}>FIRMS</Text>
+            <Text style={styles.tileLabel}>HOSPITALS</Text>
           </TouchableOpacity>
 
-          {/* Tile 4: HOSPITALS (Slate Lavender) */}
+          {/* Tile 5: ROUTES / 30-DAY MTP (Soft Sky Blue) */}
           <TouchableOpacity
-            style={[styles.tileCard, { backgroundColor: colors.tileHospitals }]}
-            onPress={() => onNavigate('HOSPITALS')}
-            activeOpacity={0.85}
-          >
-            <View style={styles.tileIconContainer}>
-              <Text style={styles.tileEmoji}>🏥</Text>
-            </View>
-            <Text style={styles.tileTitle}>HOSPITALS</Text>
-          </TouchableOpacity>
-
-          {/* Tile 5: ROUTES & CALENDAR (Cyan) */}
-          <TouchableOpacity
-            style={[styles.tileCard, { backgroundColor: colors.tileRoutes }]}
+            style={[styles.tileCard, { backgroundColor: '#E0F2FE' }]}
             onPress={() => onNavigate('ROUTES')}
-            activeOpacity={0.85}
+            activeOpacity={0.8}
           >
-            <View style={styles.tileIconContainer}>
-              <Text style={styles.tileEmoji}>📅</Text>
+            <View style={styles.tileIconCircle}>
+              <Ionicons name="calendar-outline" size={32} color="#0369A1" />
             </View>
-            <Text style={styles.tileTitle}>ROUTES</Text>
+            <Text style={styles.tileLabel}>ROUTES</Text>
           </TouchableOpacity>
 
-          {/* Tile 6: DCR / ORDERS (Peach) */}
+          {/* Tile 6: ORDERS / POB (Soft Peach/Orange) */}
           <TouchableOpacity
-            style={[styles.tileCard, { backgroundColor: colors.tileDCR }]}
+            style={[styles.tileCard, { backgroundColor: '#FFEDD5' }]}
             onPress={() => onNavigate('ORDERS')}
-            activeOpacity={0.85}
+            activeOpacity={0.8}
           >
-            <View style={styles.tileIconContainer}>
-              <Text style={styles.tileEmoji}>📑</Text>
+            <View style={styles.tileIconCircle}>
+              <Ionicons name="cart-outline" size={32} color="#C2410C" />
             </View>
-            <Text style={styles.tileTitle}>ORDERS</Text>
+            <Text style={styles.tileLabel}>ORDERS</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom Quick Action Bar */}
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={styles.bottomActionItem}
+            onPress={handleQuickSync}
+            disabled={syncing}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="sync-outline" size={24} color="#1E3A8A" />
+            <Text style={styles.bottomActionText}>
+              {syncing ? 'Syncing...' : 'Synchronize'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.bottomDivider} />
+
+          <TouchableOpacity
+            style={styles.bottomActionItem}
+            onPress={() => {
+              Alert.alert('Support Helpline', 'Regional Barak Valley HQ Desk:\n+91 8448440654\nshakirahmad878@gmail.com');
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="call-outline" size={24} color="#1E3A8A" />
+            <View style={styles.supportTextBox}>
+              <Text style={styles.supportLabel}>Support</Text>
+              <Text style={styles.supportPhone}>8448440654</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Bottom Bar: Synchronize & Support 8448440654 */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.bottomAction} onPress={handleQuickSync} activeOpacity={0.7}>
-          <Text style={styles.bottomActionIcon}>{syncing ? '⏳' : '🔄'}</Text>
-          <Text style={styles.bottomActionText}>Synchronize</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.bottomAction}
-          onPress={() => Alert.alert('Assam Regional Support', 'Calling Regional Helpline: 8448440654')}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.bottomActionIcon}>📞</Text>
-          <View>
-            <Text style={styles.bottomActionText}>Support</Text>
-            <Text style={styles.bottomPhoneText}>8448440654</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
   headerBanner: {
     backgroundColor: '#93C5FD',
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 60,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingTop: 10,
+    paddingBottom: 48,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
     position: 'relative',
-    zIndex: 1,
+    zIndex: 10,
   },
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
     zIndex: 99999,
   },
   hamburgerButton: {
-    padding: spacing.xs,
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 8,
     zIndex: 99999,
   },
-  hamburgerIcon: {
-    fontSize: 28,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+  hamburgerIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  appTitle: {
-    fontSize: typography.fontSize.xl,
+  headerCenter: {
+    alignItems: 'center',
+  },
+  headerAppName: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.black,
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  headerAppSub: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#1E3A8A',
+  },
+  notificationButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  statusBarRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  dotGreen: {
+    backgroundColor: '#22C55E',
+  },
+  dotAmber: {
+    backgroundColor: '#F59E0B',
+  },
+  statusPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
     fontWeight: typography.fontWeight.bold,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
   },
-  circularDutyWrapper: {
+  dutyCircleContainer: {
     position: 'absolute',
-    bottom: -50,
+    bottom: -46,
     left: 0,
     right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 20,
   },
-  outerRing: {
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    backgroundColor: '#60A5FA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.card,
-  },
-  innerCircle: {
-    width: 146,
-    height: 146,
-    borderRadius: 73,
+  dutyCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: '#FFFFFF',
+    borderWidth: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
+    padding: spacing.xs,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  dutyCircleActive: {
+    borderColor: '#60A5FA',
+  },
+  dutyCircleInactive: {
+    borderColor: '#93C5FD',
   },
   dutyTimeText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textSecondary,
+    fontSize: 11,
+    color: '#64748B',
     fontWeight: typography.fontWeight.medium,
   },
-  dutyHqText: {
-    fontSize: typography.fontSize.xs + 1,
-    color: '#2563EB',
-    fontWeight: typography.fontWeight.bold,
-    marginVertical: 3,
-    textAlign: 'center',
-  },
-  dutyToggleButton: {
+  dutyLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 2,
-    paddingVertical: 3,
-    paddingHorizontal: spacing.sm,
+    maxWidth: 110,
   },
-  dutyToggleButtonStart: {
-    backgroundColor: colors.success,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 5,
-  },
-  dutyToggleText: {
-    fontSize: typography.fontSize.xs,
-    color: '#475569',
-    fontWeight: typography.fontWeight.semibold,
-  },
-  dutyToggleTextStart: {
-    color: '#FFFFFF',
+  dutyLocationText: {
+    fontSize: 12,
     fontWeight: typography.fontWeight.bold,
+    color: '#1D4ED8',
+    marginLeft: 2,
   },
-  tilesScrollView: {
-    flex: 1,
-    marginTop: 60,
+  dutyActionTextStop: {
+    fontSize: 12,
+    fontWeight: typography.fontWeight.bold,
+    color: '#DC2626',
+    marginTop: 4,
   },
-  tilesContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+  dutyActionTextStart: {
+    fontSize: 13,
+    fontWeight: typography.fontWeight.bold,
+    color: '#2563EB',
+    marginTop: 2,
   },
-  tilesGrid: {
+  dutySubText: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: typography.fontWeight.medium,
+  },
+  scrollContent: {
+    paddingTop: 62,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xxl,
+  },
+  gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: spacing.md,
+    marginTop: spacing.xs,
   },
   tileCard: {
-    width: '47.5%',
-    height: 120,
-    borderRadius: radius.tile,
+    width: '48%',
+    aspectRatio: 1.15,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.subtle,
+    marginBottom: spacing.md,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
   },
-  tileIconContainer: {
+  tileIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.xs,
   },
-  tileEmoji: {
-    fontSize: 32,
-  },
-  tileTitle: {
-    fontSize: typography.fontSize.xs + 1,
-    fontWeight: typography.fontWeight.bold,
-    color: '#475569',
+  tileLabel: {
+    fontSize: 13,
+    fontWeight: typography.fontWeight.black,
+    color: '#1E293B',
     letterSpacing: 0.8,
   },
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderRadius: radius.xl,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  bottomAction: {
+  bottomActionItem: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-  },
-  bottomActionIcon: {
-    fontSize: 20,
-    color: '#2563EB',
+    justifyContent: 'center',
   },
   bottomActionText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.bold,
     color: '#1E3A8A',
+    marginLeft: spacing.sm,
   },
-  bottomPhoneText: {
+  bottomDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: colors.borderLight,
+    marginHorizontal: spacing.sm,
+  },
+  supportTextBox: {
+    marginLeft: spacing.sm,
+  },
+  supportLabel: {
     fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: '#1E3A8A',
+  },
+  supportPhone: {
+    fontSize: 11,
     fontWeight: typography.fontWeight.semibold,
-    color: '#1D4ED8',
+    color: '#3B82F6',
   },
 });

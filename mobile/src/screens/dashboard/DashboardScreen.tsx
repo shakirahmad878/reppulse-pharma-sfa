@@ -204,7 +204,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           {/* Tile 3: FIRMS / STOCKISTS (Soft Mint Green) */}
           <TouchableOpacity
             style={[styles.tileCard, { backgroundColor: '#DCFCE7' }]}
-            onPress={() => onNavigate('ROUTES', { tab: 'FIRMS' })}
+            onPress={() => onNavigate('FIRMS')}
             activeOpacity={0.8}
           >
             <View style={styles.tileIconCircle}>
@@ -216,7 +216,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           {/* Tile 4: HOSPITALS (Soft Lavender) */}
           <TouchableOpacity
             style={[styles.tileCard, { backgroundColor: '#EDE9FE' }]}
-            onPress={() => onNavigate('ROUTES', { tab: 'HOSPITALS' })}
+            onPress={() => onNavigate('HOSPITALS')}
             activeOpacity={0.8}
           >
             <View style={styles.tileIconCircle}>

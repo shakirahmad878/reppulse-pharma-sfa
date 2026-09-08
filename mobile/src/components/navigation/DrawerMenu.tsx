@@ -42,13 +42,16 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({
   const menuItems: MenuItem[] = [
     { key: 'DASHBOARD', label: 'Home', icon: 'home-outline' },
     { key: 'VISIT_EXECUTION_LIST', label: 'Visits', icon: 'medkit-outline' },
-    { key: 'DOCTORS', label: 'Clients', icon: 'people-outline' },
+    { key: 'DOCTORS', label: 'Clients / Doctors', icon: 'people-outline' },
+    { key: 'HOSPITALS', label: 'Hospitals Directory', icon: 'business-outline' },
+    { key: 'FIRMS', label: 'Firms & Stockists', icon: 'storefront-outline' },
     { key: 'ROUTES', label: 'Calendar & Route Plan', icon: 'calendar-outline' },
+    { key: 'ORDERS', label: 'POB Orders', icon: 'cart-outline' },
     { key: 'SYNC', label: 'Synchronize', icon: 'cloud-upload-outline' },
     { key: 'NOTIFICATIONS', label: 'Notification', icon: 'notifications-outline' },
     { key: 'EXPENSES', label: 'Expenses', icon: 'receipt-outline' },
     { key: 'LEAVES', label: 'Leaves', icon: 'airplane-outline' },
-    { key: 'FILES', label: 'Files', icon: 'folder-open-outline' },
+    { key: 'FILES', label: 'Files & e-Detailing', icon: 'folder-open-outline' },
     { key: 'COMMANDS', label: 'Commands', icon: 'terminal-outline' },
     { key: 'PROFILE', label: 'My Info', icon: 'person-outline' },
   ];
@@ -78,7 +81,7 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({
               {user?.role === 'MEDICAL_REP' ? 'Medical Representative (MR)' : user?.role || 'Representative'}
             </Text>
             <View style={styles.territoryRow}>
-              <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.9)" />
+              <Ionicons name="location-outline" size={14} color="#1E3A8A" />
               <Text style={styles.userTerritory}>{user?.territory || 'Barak Division, Assam'}</Text>
             </View>
             <View style={styles.divider} />
@@ -99,7 +102,7 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({
                     <Ionicons
                       name={item.icon}
                       size={20}
-                      color={isActive ? colors.primary : '#1E3A8A'}
+                      color={isActive ? '#1D4ED8' : '#1E3A8A'}
                     />
                   </View>
                   <Text style={[styles.menuText, isActive && styles.menuTextActive]}>
@@ -120,7 +123,7 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({
 
           {/* Footer Version Tag */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>RepPulse v1.2.0 (Barak Division)</Text>
+            <Text style={styles.footerText}>RepPulse v1.3.1 (Barak Division)</Text>
           </View>
         </View>
       </View>
@@ -208,10 +211,10 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 9,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-    marginVertical: 2,
+    marginVertical: 1,
   },
   menuItemActive: {
     backgroundColor: '#FFFFFF',
@@ -228,7 +231,7 @@ const styles = StyleSheet.create({
   },
   iconBoxActive: {},
   menuText: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm + 1,
     fontWeight: typography.fontWeight.medium,
     color: '#1E3A8A',
     marginLeft: spacing.sm,
@@ -247,7 +250,7 @@ const styles = StyleSheet.create({
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: spacing.md,
     marginTop: spacing.md,
     marginBottom: spacing.xxl,
@@ -260,7 +263,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoutText: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm + 1,
     fontWeight: typography.fontWeight.bold,
     color: '#DC2626',
     marginLeft: spacing.sm,

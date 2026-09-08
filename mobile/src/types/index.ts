@@ -31,7 +31,7 @@ export interface RoutePlan {
   code: string;
   name: string;
   district: 'Cachar' | 'Karimganj' | 'Hailakandi';
-  areas: string[];
+  areas?: string[];
   totalDoctors: number;
   totalHospitals: number;
   totalChemists: number;
@@ -46,6 +46,8 @@ export interface RouteChangeRequest {
   id: string;
   employeeId: string;
   employeeName: string;
+  dayNumber?: number;
+  dateString?: string;
   currentRouteId: string;
   currentRouteName: string;
   requestedRouteId: string;
@@ -58,10 +60,69 @@ export interface RouteChangeRequest {
   reviewComment?: string;
 }
 
+export type AccompaniedPerson =
+  | 'SELF_SOLO'
+  | 'ABM'
+  | 'RBM'
+  | 'CO_MR'
+  | 'MEDICAL_ADVISOR'
+  | 'ABM_G_SOLANKI'
+  | 'RBM_RAJESH_SHARMA'
+  | 'COLLEAGUE_AMIT_PAUL'
+  | 'PRODUCT_SPECIALIST';
+
+export interface MTPDayPlan {
+  dayNumber: number; // 1-30
+  dateString: string; // '2026-09-01'
+  dayOfWeek: string; // 'Tue', 'Sun', etc.
+  routeId: string;
+  routeName: string;
+  district: 'Cachar' | 'Karimganj' | 'Hailakandi' | 'HQ' | string;
+  areas?: string[];
+  plannedDoctorCount?: number;
+  targetDoctorCalls?: number;
+  plannedChemistCount?: number;
+  targetChemistCalls?: number;
+  accompaniedBy?: AccompaniedPerson;
+  accompaniedPerson?: AccompaniedPerson;
+  accompaniedName?: string;
+  isSunday: boolean;
+  isJointWorking?: boolean;
+  status: 'SCHEDULED' | 'APPROVED' | 'COMPLETED' | 'DEVIATED' | 'HOLIDAY' | 'DEVIATION_REQUESTED';
+  actualRouteId?: string;
+  actualRouteName?: string;
+  deviationTargetRouteId?: string;
+  deviationTargetRouteName?: string;
+  deviationReason?: string;
+}
+
+export interface MonthlyTourProgramme {
+  month?: string;
+  monthName?: string;
+  monthIndex?: number;
+  year: number;
+  employeeId: string;
+  employeeName: string;
+  headquarter?: string;
+  territory?: string;
+  totalWorkingDays: number;
+  totalWeeklyOffs?: number;
+  totalDoctorTargets?: number;
+  totalPlannedDoctorCalls?: number;
+  totalChemistTargets?: number;
+  totalPlannedChemistCalls?: number;
+  jointWorkingDaysCount?: number;
+  status?: 'APPROVED' | 'DRAFT' | 'SUBMITTED' | string;
+  approvalStatus?: 'APPROVED' | 'DRAFT' | 'SUBMITTED' | string;
+  approvedBy?: string;
+  approvalDate?: string;
+  days: MTPDayPlan[];
+}
+
 export interface Hospital {
   id: string;
   name: string;
-  type: 'GOVERNMENT_MEDICAL_COLLEGE' | 'CIVIL_HOSPITAL' | 'PRIVATE_HOSPITAL' | 'NURSING_HOME';
+  type: 'GOVERNMENT_MEDICAL_COLLEGE' | 'CIVIL_HOSPITAL' | 'PRIVATE_HOSPITAL' | 'NURSING_HOME' | 'COMMUNITY_HEALTH_CENTRE' | 'EYE_HOSPITAL' | string;
   district: string;
   area: string;
   address: string;
@@ -77,7 +138,7 @@ export interface StockistFirm {
   id: string;
   name: string;
   contactPerson: string;
-  type: 'SUPER_STOCKIST' | 'AUTHORIZED_DISTRIBUTOR' | 'WHOLESALE_PHARMA';
+  type: 'SUPER_STOCKIST' | 'AUTHORIZED_DISTRIBUTOR' | 'WHOLESALE_PHARMA' | string;
   dlNumber: string;
   gstNumber: string;
   district: string;
@@ -127,7 +188,7 @@ export interface Product {
   id: string;
   brandName: string;
   genericName: string;
-  category: 'Cardiology' | 'Diabetology' | 'Anti-Infective' | 'Orthopedics' | 'Respiratory' | 'General';
+  category: 'Cardiology' | 'Diabetology' | 'Anti-Infective' | 'Orthopedics' | 'Respiratory' | 'General' | string;
   dosageForm: string;
   packSize: string;
   mrp: number;
@@ -146,6 +207,32 @@ export type VisitStatus =
   | 'CANCELLED'
   | 'SYNC_PENDING'
   | 'SYNCED';
+
+export type VisitPurpose =
+  | 'ROUTINE_CALL'
+  | 'NEW_LAUNCH_DETAILED'
+  | 'SAMPLE_DELIVERY'
+  | 'PAYMENT_FOLLOWUP'
+  | 'JOINT_STRATEGIC_CALL'
+  | 'CME_ENGAGEMENT';
+
+export type PrescribingHabit =
+  | 'HIGH_PRESCRIBER'
+  | 'MODERATE'
+  | 'POTENTIAL'
+  | 'COMPETITOR_LOYAL'
+  | 'CORE_PRESCRIBER'
+  | 'COMPETITOR_SWITCHED'
+  | 'NEW_TRIAL_PROMISED'
+  | 'FOLLOWUP_REQUIRED';
+
+export type ProductReaction =
+  | 'VERY_POSITIVE'
+  | 'POSITIVE'
+  | 'NEUTRAL'
+  | 'OBJECTION'
+  | 'MODERATE'
+  | 'HIGH_INTEREST';
 
 export interface VisitRecord {
   id: string;
@@ -168,10 +255,16 @@ export interface VisitRecord {
   checkOutLatitude?: number;
   checkOutLongitude?: number;
   visitDurationMinutes?: number;
-  visitPurpose: 'ROUTINE_CALL' | 'NEW_LAUNCH_DETAILED' | 'SAMPLE_DELIVERY' | 'PAYMENT_FOLLOWUP';
+  visitPurpose: VisitPurpose;
+  accompaniedBy?: AccompaniedPerson;
+  accompaniedName?: string;
   discussionNotes: string;
   productsDiscussed: string[];
-  samplesDistributed: { productId: string; productName: string; quantity: number }[];
+  productReactions?: { productId: string; productName: string; reaction: ProductReaction }[];
+  samplesDistributed: { productId: string; productName: string; quantity: number; batchNo?: string }[];
+  promotionalInputs?: string[];
+  promotionalInputsGiven?: string[];
+  doctorPrescribingHabit?: PrescribingHabit;
   doctorFeedback: string;
   nextFollowUpDate?: string;
   pobAmount?: number;

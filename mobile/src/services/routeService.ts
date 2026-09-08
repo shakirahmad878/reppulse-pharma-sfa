@@ -1,10 +1,11 @@
 import { StorageService, STORAGE_KEYS } from './storageService';
-import { RoutePlan, RouteChangeRequest } from '../types';
-import { BARAK_ROUTES, CURRENT_USER } from '../constants/mockData';
+import { RoutePlan, RouteChangeRequest, MonthlyTourProgramme, MTPDayPlan } from '../types';
+import { BARAK_ROUTES, CURRENT_USER, SEPTEMBER_2026_MTP } from '../constants/mockData';
 
 const ROUTE_STORAGE_KEY = 'REPPULSE_ROUTES';
 const ACTIVE_ROUTE_KEY = 'REPPULSE_ACTIVE_ROUTE_ID';
 const ROUTE_REQUESTS_KEY = 'REPPULSE_ROUTE_CHANGE_REQUESTS';
+const MTP_STORAGE_KEY = 'REPPULSE_MTP_SEPTEMBER_2026';
 
 export class RouteService {
   public static async getRoutes(): Promise<RoutePlan[]> {
@@ -45,32 +46,67 @@ export class RouteService {
     return true;
   }
 
-  public static async getRouteChangeRequests(): Promise<RouteChangeRequest[]> {
-    return await StorageService.getItem<RouteChangeRequest[]>(ROUTE_REQUESTS_KEY, []);
+  public static async getMonthlyTourPlan(): Promise<MonthlyTourProgramme> {
+    let mtp = await StorageService.getItem<MonthlyTourProgramme | null>(MTP_STORAGE_KEY, null);
+    if (!mtp) {
+      mtp = SEPTEMBER_2026_MTP;
+      await StorageService.setItem(MTP_STORAGE_KEY, mtp);
+    }
+    return mtp;
   }
 
-  public static async requestRouteChange(requestedRouteId: string, reason: string): Promise<RouteChangeRequest> {
+  public static async getTodayMTPDay(): Promise<MTPDayPlan | null> {
+    const mtp = await this.getMonthlyTourPlan();
+    const todayNum = new Date().getDate(); // 1 to 30
+    const day = mtp.days.find(d => d.dayNumber === todayNum);
+    return day || mtp.days[0];
+  }
+
+  public static async requestMTPDeviation(
+    dayNumber: number,
+    newRouteId: string,
+    reason: string
+  ): Promise<RouteChangeRequest> {
+    const mtp = await this.getMonthlyTourPlan();
+    const day = mtp.days.find(d => d.dayNumber === dayNumber);
     const routes = await this.getRoutes();
-    const activeRoute = await this.getActiveRoute();
-    const targetRoute = routes.find(r => r.id === requestedRouteId);
+    const targetRoute = routes.find(r => r.id === newRouteId);
 
     const request: RouteChangeRequest = {
-      id: 'req_' + Date.now() + '_' + Math.random().toString(36).substring(7),
+      id: 'req_mtp_' + Date.now() + '_' + Math.random().toString(36).substring(7),
       employeeId: CURRENT_USER.id,
       employeeName: CURRENT_USER.name,
-      currentRouteId: activeRoute.id,
-      currentRouteName: activeRoute.name,
-      requestedRouteId: targetRoute ? targetRoute.id : requestedRouteId,
-      requestedRouteName: targetRoute ? targetRoute.name : 'Unknown Route',
+      dayNumber,
+      dateString: day ? day.dateString : 'Day ' + dayNumber,
+      currentRouteId: day ? day.routeId : 'unknown',
+      currentRouteName: day ? day.routeName : 'Scheduled Route',
+      requestedRouteId: targetRoute ? targetRoute.id : newRouteId,
+      requestedRouteName: targetRoute ? targetRoute.name : 'Target Beat',
       reason: reason.trim() || 'Schedule adjustment requested for client priority.',
       requestTimestamp: new Date().toISOString(),
       status: 'PENDING_APPROVAL',
     };
 
+    if (day) {
+      day.status = 'DEVIATION_REQUESTED';
+      day.deviationReason = reason;
+      day.deviationTargetRouteId = newRouteId;
+      day.deviationTargetRouteName = targetRoute ? targetRoute.name : 'Target Beat';
+      await StorageService.setItem(MTP_STORAGE_KEY, mtp);
+    }
+
     const existing = await this.getRouteChangeRequests();
     const updated = [request, ...existing];
     await StorageService.setItem(ROUTE_REQUESTS_KEY, updated);
     return request;
+  }
+
+  public static async getRouteChangeRequests(): Promise<RouteChangeRequest[]> {
+    return await StorageService.getItem<RouteChangeRequest[]>(ROUTE_REQUESTS_KEY, []);
+  }
+
+  public static async requestRouteChange(requestedRouteId: string, reason: string): Promise<RouteChangeRequest> {
+    return await this.requestMTPDeviation(new Date().getDate(), requestedRouteId, reason);
   }
 
   public static async adminReviewRequest(
@@ -84,12 +120,22 @@ export class RouteService {
 
     const req = requests[idx];
     req.status = approve ? 'APPROVED' : 'REJECTED';
-    req.reviewedBy = 'Regional Admin (Indore/Guwahati HQ)';
+    req.reviewedBy = 'Rajesh Sharma (RBM - East & Assam Zone)';
     req.reviewedTimestamp = new Date().toISOString();
-    req.reviewComment = reviewComment || (approve ? 'Route deviation approved by Admin.' : 'Route deviation rejected by Admin.');
+    req.reviewComment = reviewComment || (approve ? 'MTP deviation approved by RBM.' : 'Deviation request rejected.');
 
     if (approve) {
       await this.setActiveRoute(req.requestedRouteId);
+      const mtp = await this.getMonthlyTourPlan();
+      if (req.dayNumber) {
+        const day = mtp.days.find(d => d.dayNumber === req.dayNumber);
+        if (day) {
+          day.routeId = req.requestedRouteId;
+          day.routeName = req.requestedRouteName;
+          day.status = 'SCHEDULED';
+          await StorageService.setItem(MTP_STORAGE_KEY, mtp);
+        }
+      }
     }
 
     requests[idx] = req;

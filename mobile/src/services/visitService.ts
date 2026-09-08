@@ -9,10 +9,11 @@ export class VisitService {
   }
 
   public static async createVisit(visit: Omit<VisitRecord, 'id' | 'syncStatus'>): Promise<VisitRecord> {
+    const newId = 'vis_' + Date.now().toString() + '_' + Math.random().toString(36).substring(7);
     const newVisit: VisitRecord = {
       ...visit,
-      id: `vis_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      syncStatus: 'PENDING'
+      id: newId,
+      syncStatus: 'PENDING',
     };
 
     const visits = await this.getVisits();
@@ -26,5 +27,9 @@ export class VisitService {
     await SyncService.enqueue('VISIT', newVisit);
 
     return newVisit;
+  }
+
+  public static async recordVisit(visit: Omit<VisitRecord, 'id' | 'syncStatus'>): Promise<VisitRecord> {
+    return this.createVisit(visit);
   }
 }

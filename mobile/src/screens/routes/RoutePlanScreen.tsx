@@ -14,18 +14,23 @@ import { colors, typography, spacing, radius, shadows } from '../../constants/th
 import { Header } from '../../components/common/Header';
 import { Badge } from '../../components/common/Badge';
 import { RouteService } from '../../services/routeService';
-import { RoutePlan, RouteChangeRequest } from '../../types';
+import { RoutePlan, MonthlyTourProgramme, MTPDayPlan, RouteChangeRequest } from '../../types';
 
 interface RoutePlanScreenProps {
   onBack: () => void;
 }
 
 export const RoutePlanScreen: React.FC<RoutePlanScreenProps> = ({ onBack }) => {
+  const [activeTab, setActiveTab] = useState<'MTP_MONTH' | 'ALL_BEATS'>('MTP_MONTH');
+  const [mtp, setMtp] = useState<MonthlyTourProgramme | null>(null);
   const [routes, setRoutes] = useState<RoutePlan[]>([]);
   const [activeRoute, setActiveRoute] = useState<RoutePlan | null>(null);
   const [requests, setRequests] = useState<RouteChangeRequest[]>([]);
+  
+  // Deviation Modal State
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedNewRouteId, setSelectedNewRouteId] = useState<string>('');
+  const [selectedDayPlan, setSelectedDayPlan] = useState<MTPDayPlan | null>(null);
+  const [targetRouteId, setTargetRouteId] = useState<string>('');
   const [deviationReason, setDeviationReason] = useState<string>('');
   const [isAdminMode, setIsAdminMode] = useState(false);
 
@@ -34,33 +39,44 @@ export const RoutePlanScreen: React.FC<RoutePlanScreenProps> = ({ onBack }) => {
   }, []);
 
   const loadData = async () => {
-    const list = await RouteService.getRoutes();
-    setRoutes(list);
+    const mtpData = await RouteService.getMonthlyTourPlan();
+    setMtp(mtpData);
+    const routeList = await RouteService.getRoutes();
+    setRoutes(routeList);
     const active = await RouteService.getActiveRoute();
     setActiveRoute(active);
-    const reqs = await RouteService.getRouteChangeRequests();
-    setRequests(reqs);
+    const reqList = await RouteService.getRouteChangeRequests();
+    setRequests(reqList);
   };
 
-  const handleSelectRoute = async (route: RoutePlan) => {
-    if (route.id === activeRoute?.id) return;
-    setSelectedNewRouteId(route.id);
+  const handleOpenDeviation = (day: MTPDayPlan) => {
+    if (day.isSunday) {
+      Alert.alert('Sunday Off', 'Sunday is scheduled as weekly rest & offline sync day.');
+      return;
+    }
+    setSelectedDayPlan(day);
+    setTargetRouteId(routes[0]?.id || 'route-cachar-01');
     setDeviationReason('');
     setModalVisible(true);
   };
 
   const handleSubmitDeviation = async () => {
+    if (!selectedDayPlan) return;
     if (!deviationReason.trim()) {
-      Alert.alert('Reason Required', 'Please enter a reason for deviating from your scheduled route.');
+      Alert.alert('Reason Required', 'Please provide a clear justification for deviating from the approved MTP.');
       return;
     }
 
-    const req = await RouteService.requestRouteChange(selectedNewRouteId, deviationReason);
+    const req = await RouteService.requestMTPDeviation(
+      selectedDayPlan.dayNumber,
+      targetRouteId,
+      deviationReason
+    );
     setModalVisible(false);
     await loadData();
     Alert.alert(
-      'Request Submitted',
-      'Your route change request for "' + req.requestedRouteName + '" has been submitted to Admin. Status: PENDING APPROVAL.'
+      'MTP Deviation Submitted',
+      'Request for ' + req.dateString + ' -> ' + req.requestedRouteName + ' submitted to RBM. Status: PENDING APPROVAL.'
     );
   };
 
@@ -68,167 +84,256 @@ export const RoutePlanScreen: React.FC<RoutePlanScreenProps> = ({ onBack }) => {
     await RouteService.adminReviewRequest(requestId, approve);
     await loadData();
     Alert.alert(
-      approve ? 'Route Approved' : 'Route Rejected',
-      approve ? 'Active route updated for representative.' : 'Deviation request rejected.'
+      approve ? 'MTP Deviation Approved' : 'Deviation Rejected',
+      approve ? 'Updated beat activated for the representative.' : 'Request has been rejected.'
     );
   };
+
+  const todayDateNum = new Date().getDate();
 
   return (
     <SafeAreaView style={styles.container}>
       <Header
-        title="Route Plan and Beat"
-        subtitle="Barak Valley Division (Assam)"
+        title="Monthly Tour Plan (MTP)"
+        subtitle="Barak Valley Division (Assam) • Sep 2026"
         showBack
         onBack={onBack}
       />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        {/* Active Route Hero Card */}
-        <View style={styles.activeCard}>
-          <View style={styles.activeHeaderRow}>
-            <Text style={styles.activeTag}>TODAYS ACTIVE ROUTE</Text>
-            <Badge label="APPROVED AND ACTIVE" variant="success" />
-          </View>
-          <Text style={styles.activeRouteTitle}>{activeRoute?.name || 'Loading...'}</Text>
-          <Text style={styles.activeRouteDesc}>{activeRoute?.description}</Text>
-          
-          <View style={styles.activeStatsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{activeRoute?.totalDoctors || 0}</Text>
-              <Text style={styles.statLbl}>Doctors</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{activeRoute?.totalHospitals || 0}</Text>
-              <Text style={styles.statLbl}>Hospitals</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{activeRoute?.totalChemists || 0}</Text>
-              <Text style={styles.statLbl}>Chemists</Text>
-            </View>
-          </View>
-        </View>
+      {/* Mode Switcher: 30-Day MTP Calendar | All Barak Beats */}
+      <View style={styles.tabSwitcherRow}>
+        <TouchableOpacity
+          style={[styles.tabSwitchBtn, activeTab === 'MTP_MONTH' && styles.tabSwitchBtnActive]}
+          onPress={() => setActiveTab('MTP_MONTH')}
+        >
+          <Text style={[styles.tabSwitchText, activeTab === 'MTP_MONTH' && styles.tabSwitchTextActive]}>
+            📅 30-Day MTP Schedule
+          </Text>
+        </TouchableOpacity>
 
-        {/* Route Change Requests Status */}
-        {requests.length > 0 && (
-          <View style={styles.sectionWrapper}>
+        <TouchableOpacity
+          style={[styles.tabSwitchBtn, activeTab === 'ALL_BEATS' && styles.tabSwitchBtnActive]}
+          onPress={() => setActiveTab('ALL_BEATS')}
+        >
+          <Text style={[styles.tabSwitchText, activeTab === 'ALL_BEATS' && styles.tabSwitchTextActive]}>
+            🗺️ All Barak Beats ({routes.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+        {activeTab === 'MTP_MONTH' ? (
+          <>
+            {/* MTP Month Approval Header Banner */}
+            <View style={styles.mtpHeroBanner}>
+              <View style={styles.bannerTopRow}>
+                <Text style={styles.bannerMonthTitle}>September 2026 Advance Tour Plan</Text>
+                <Badge label="APPROVED BY RBM" variant="success" />
+              </View>
+              <Text style={styles.bannerSub}>
+                Authorized by: {mtp?.approvedBy || 'Rajesh Sharma (RBM)'}
+              </Text>
+
+              {/* Monthly KPI Overview */}
+              <View style={styles.kpiRow}>
+                <View style={styles.kpiCol}>
+                  <Text style={styles.kpiVal}>{mtp?.totalWorkingDays || 26}</Text>
+                  <Text style={styles.kpiLbl}>Working Days</Text>
+                </View>
+                <View style={styles.kpiCol}>
+                  <Text style={styles.kpiVal}>{mtp?.totalPlannedDoctorCalls || 240}</Text>
+                  <Text style={styles.kpiLbl}>Doctor Calls</Text>
+                </View>
+                <View style={styles.kpiCol}>
+                  <Text style={styles.kpiVal}>{mtp?.totalPlannedChemistCalls || 96}</Text>
+                  <Text style={styles.kpiLbl}>Chemist Calls</Text>
+                </View>
+                <View style={styles.kpiCol}>
+                  <Text style={styles.kpiVal}>4 Days</Text>
+                  <Text style={styles.kpiLbl}>Joint Working</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Admin Toggle Row */}
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Route Deviation Requests</Text>
+              <Text style={styles.sectionTitle}>30-Day Daily Tour Schedule</Text>
               <TouchableOpacity
                 onPress={() => setIsAdminMode(!isAdminMode)}
                 style={styles.adminToggleBtn}
               >
                 <Text style={styles.adminToggleText}>
-                  {isAdminMode ? '🛡️ Admin Mode (ON)' : '👤 Rep View'}
+                  {isAdminMode ? '🛡️ Admin Review Mode (ON)' : '👤 Rep Mode'}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {requests.map(req => (
-              <View key={req.id} style={styles.requestCard}>
-                <View style={styles.reqTopRow}>
-                  <Text style={styles.reqTarget}>{req.requestedRouteName}</Text>
-                  <Badge
-                    label={req.status.replace('_', ' ')}
-                    variant={
-                      req.status === 'APPROVED'
-                        ? 'success'
-                        : req.status === 'REJECTED'
-                        ? 'danger'
-                        : 'warning'
-                    }
-                  />
-                </View>
-                <Text style={styles.reqReason}>📝 "{req.reason}"</Text>
-                <Text style={styles.reqTime}>
-                  Submitted: {new Date(req.requestTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
+            {/* Requests Section if any */}
+            {requests.length > 0 && (
+              <View style={styles.requestsSection}>
+                <Text style={styles.subSectionTitle}>Active Deviation Requests ({requests.length})</Text>
+                {requests.map(req => (
+                  <View key={req.id} style={styles.reqCard}>
+                    <View style={styles.reqHeader}>
+                      <Text style={styles.reqDate}>{req.dateString || 'Day Target'}</Text>
+                      <Badge
+                        label={req.status.replace('_', ' ')}
+                        variant={req.status === 'APPROVED' ? 'success' : req.status === 'REJECTED' ? 'danger' : 'warning'}
+                      />
+                    </View>
+                    <Text style={styles.reqText}>Target: <Text style={styles.boldText}>{req.requestedRouteName}</Text></Text>
+                    <Text style={styles.reqReason}>Reason: "{req.reason}"</Text>
 
-                {isAdminMode && req.status === 'PENDING_APPROVAL' && (
-                  <View style={styles.adminActionRow}>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.approveBtn]}
-                      onPress={() => handleAdminApproval(req.id, true)}
-                    >
-                      <Text style={styles.actionBtnText}>✓ Approve Route</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.rejectBtn]}
-                      onPress={() => handleAdminApproval(req.id, false)}
-                    >
-                      <Text style={styles.actionBtnText}>✕ Reject</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Available Routes in Barak Division */}
-        <Text style={styles.sectionTitle}>All Barak Division Routes</Text>
-        <Text style={styles.sectionSubtitle}>
-          Tap any route to switch. Route deviations require Admin approval.
-        </Text>
-
-        {routes.map(route => {
-          const isActive = route.id === activeRoute?.id;
-          return (
-            <TouchableOpacity
-              key={route.id}
-              style={[styles.routeItemCard, isActive && styles.routeItemCardActive]}
-              activeOpacity={0.8}
-              onPress={() => handleSelectRoute(route)}
-            >
-              <View style={styles.routeHeaderRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.routeCode, isActive && styles.routeCodeActive]}>
-                    {route.code} • {route.district} District
-                  </Text>
-                  <Text style={styles.routeName}>{route.name}</Text>
-                </View>
-                <Badge
-                  label={isActive ? 'ACTIVE' : route.isAssigned ? 'ASSIGNED' : 'TRANSFERABLE'}
-                  variant={isActive ? 'primary' : 'muted'}
-                />
-              </View>
-
-              <View style={styles.areasTagRow}>
-                {route.areas.map((area, idx) => (
-                  <View key={idx} style={styles.areaTag}>
-                    <Text style={styles.areaTagText}>📍 {area}</Text>
+                    {isAdminMode && req.status === 'PENDING_APPROVAL' && (
+                      <View style={styles.adminActionRow}>
+                        <TouchableOpacity
+                          style={[styles.adminBtn, styles.approveBtn]}
+                          onPress={() => handleAdminApproval(req.id, true)}
+                        >
+                          <Text style={styles.adminBtnText}>✓ Approve Deviation</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.adminBtn, styles.rejectBtn]}
+                          onPress={() => handleAdminApproval(req.id, false)}
+                        >
+                          <Text style={styles.adminBtnText}>✕ Reject</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>
+            )}
 
-              <View style={styles.routeFooterRow}>
-                <Text style={styles.routeCoverage}>
-                  {route.totalDoctors} Doctors • {route.totalHospitals} Hospitals • {route.totalChemists} Chemists
-                </Text>
-                {!isActive && (
-                  <Text style={styles.switchText}>Request Switch ›</Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+            {/* Daily Timeline Cards */}
+            {mtp?.days.map(day => {
+              const isToday = day.dayNumber === todayDateNum;
+              return (
+                <View
+                  key={day.dayNumber}
+                  style={[
+                    styles.dayCard,
+                    isToday && styles.dayCardToday,
+                    day.isSunday && styles.dayCardSunday,
+                  ]}
+                >
+                  <View style={styles.dayTopRow}>
+                    <View style={styles.dateCircle}>
+                      <Text style={[styles.dayNum, isToday && styles.dayNumToday]}>{day.dayNumber}</Text>
+                      <Text style={styles.dayWk}>{day.dayOfWeek}</Text>
+                    </View>
+
+                    <View style={{ flex: 1, marginLeft: spacing.md }}>
+                      <View style={styles.routeHeaderRow}>
+                        <Text style={[styles.dayRouteName, isToday && styles.dayRouteNameToday]} numberOfLines={1}>
+                          {day.routeName}
+                        </Text>
+                        {isToday && <Badge label="TODAY" variant="primary" />}
+                        {day.isSunday && <Badge label="OFF" variant="muted" />}
+                      </View>
+
+                      {!day.isSunday && (
+                        <View style={styles.dayMetaRow}>
+                          <Text style={styles.dayMetaText}>🎯 {day.targetDoctorCalls} Dr Calls • {day.targetChemistCalls} Chemist</Text>
+                          {day.isJointWorking && (
+                            <View style={styles.jointTag}>
+                              <Text style={styles.jointTagText}>👔 Joint: {day.accompaniedName}</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {!day.isSunday && (
+                    <View style={styles.dayFooterRow}>
+                      <Text style={styles.districtTag}>📍 {day.district} District</Text>
+                      <TouchableOpacity
+                        style={styles.deviateBtn}
+                        onPress={() => handleOpenDeviation(day)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.deviateBtnText}>Change Beat ›</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </>
+        ) : (
+          <>
+            {/* All Barak Division Beats Directory */}
+            <Text style={styles.sectionTitle}>Barak Division Standard Master Beats</Text>
+            <Text style={styles.sectionSubtitle}>Pre-configured territory circuits for Cachar, Karimganj, and Hailakandi</Text>
+
+            {routes.map(route => {
+              const isActive = route.id === activeRoute?.id;
+              return (
+                <View
+                  key={route.id}
+                  style={[styles.masterBeatCard, isActive && styles.masterBeatCardActive]}
+                >
+                  <View style={styles.beatHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.beatCode}>{route.code} • {route.district} District</Text>
+                      <Text style={styles.beatName}>{route.name}</Text>
+                    </View>
+                    <Badge label={isActive ? 'TODAYS BEAT' : 'STANDARD'} variant={isActive ? 'primary' : 'muted'} />
+                  </View>
+                  <Text style={styles.beatDesc}>{route.description}</Text>
+
+                  <View style={styles.areasTagWrap}>
+                    {route.areas.map((area, idx) => (
+                      <View key={idx} style={styles.areaChip}>
+                        <Text style={styles.areaChipText}>📍 {area}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.beatFooter}>
+                    <Text style={styles.beatStats}>
+                      👨‍⚕️ {route.totalDoctors} Doctors • 🏥 {route.totalHospitals} Hospitals • 💊 {route.totalChemists} Chemists
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
       </ScrollView>
 
-      {/* Deviation Request Modal */}
+      {/* MTP Deviation Request Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Request Route Change</Text>
+            <Text style={styles.modalTitle}>Request MTP Route Deviation</Text>
             <Text style={styles.modalSubtitle}>
-              Target: {routes.find(r => r.id === selectedNewRouteId)?.name}
+              For: {selectedDayPlan?.dateString} ({selectedDayPlan?.routeName})
             </Text>
 
-            <Text style={styles.inputLabel}>Reason for Route Deviation (Required for Admin):</Text>
+            <Text style={styles.inputLabel}>Select Proposed Replacement Beat:</Text>
+            <View style={styles.routePickerWrap}>
+              {routes.map(r => (
+                <TouchableOpacity
+                  key={r.id}
+                  style={[styles.routePickerItem, targetRouteId === r.id && styles.routePickerItemActive]}
+                  onPress={() => setTargetRouteId(r.id)}
+                >
+                  <Text style={[styles.routePickerText, targetRouteId === r.id && styles.routePickerTextActive]}>
+                    {r.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Reason for Month Plan Deviation (Mandatory):</Text>
             <TextInput
               style={styles.reasonInput}
-              placeholder="e.g. Urgent doctor call requested at SMCH Ghungoor or emergency sample delivery."
+              placeholder="e.g. Urgent key doctor call at SMCH or priority stockist order followup."
               placeholderTextColor="#94A3B8"
               multiline
-              numberOfLines={4}
+              numberOfLines={3}
               value={deviationReason}
               onChangeText={setDeviationReason}
             />
@@ -244,7 +349,7 @@ export const RoutePlanScreen: React.FC<RoutePlanScreenProps> = ({ onBack }) => {
                 style={[styles.modalBtn, styles.modalSubmitBtn]}
                 onPress={handleSubmitDeviation}
               >
-                <Text style={styles.modalSubmitText}>Submit to Admin</Text>
+                <Text style={styles.modalSubmitText}>Submit to RBM</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -255,51 +360,42 @@ export const RoutePlanScreen: React.FC<RoutePlanScreenProps> = ({ onBack }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  tabSwitcherRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    padding: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  tabSwitchBtn: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: radius.md,
   },
-  scroll: {
-    flex: 1,
+  tabSwitchBtnActive: {
+    backgroundColor: '#EFF6FF',
+    borderBottomWidth: 2,
+    borderBottomColor: '#2563EB',
   },
-  scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxxl,
-  },
-  activeCard: {
+  tabSwitchText: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.semibold, color: '#64748B' },
+  tabSwitchTextActive: { color: '#1D4ED8', fontWeight: typography.fontWeight.bold },
+  scroll: { flex: 1 },
+  scrollContent: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  mtpHeroBanner: {
     backgroundColor: '#FFFFFF',
     borderRadius: radius.xl,
     padding: spacing.lg,
-    borderWidth: 1.5,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
     borderColor: '#3B82F6',
-    marginBottom: spacing.xl,
     ...shadows.card,
   },
-  activeHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-  },
-  activeTag: {
-    fontSize: typography.fontSize.xxs + 1,
-    fontWeight: typography.fontWeight.black,
-    color: '#2563EB',
-    letterSpacing: 0.8,
-  },
-  activeRouteTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.black,
-    color: '#0F172A',
-    marginTop: 2,
-  },
-  activeRouteDesc: {
-    fontSize: typography.fontSize.xs,
-    color: '#64748B',
-    marginTop: spacing.xs,
-    lineHeight: 18,
-  },
-  activeStatsRow: {
+  bannerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  bannerMonthTitle: { fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.black, color: '#0F172A' },
+  bannerSub: { fontSize: typography.fontSize.xs, color: '#2563EB', marginTop: 2, fontWeight: typography.fontWeight.semibold },
+  kpiRow: {
     flexDirection: 'row',
     backgroundColor: '#EFF6FF',
     borderRadius: radius.md,
@@ -307,234 +403,112 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     justifyContent: 'space-around',
   },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNum: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: '#1D4ED8',
-  },
-  statLbl: {
-    fontSize: typography.fontSize.xxs,
-    color: '#64748B',
-    fontWeight: typography.fontWeight.semibold,
-  },
-  sectionWrapper: {
-    marginBottom: spacing.xl,
-  },
+  kpiCol: { alignItems: 'center' },
+  kpiVal: { fontSize: typography.fontSize.md, fontWeight: typography.fontWeight.bold, color: '#1D4ED8' },
+  kpiLbl: { fontSize: typography.fontSize.xxs, color: '#64748B', marginTop: 2 },
   sectionHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: '#0F172A',
-  },
-  sectionSubtitle: {
-    fontSize: typography.fontSize.xs,
-    color: '#64748B',
+    alignItems: 'center',
     marginBottom: spacing.md,
   },
-  adminToggleBtn: {
-    backgroundColor: '#DBEAFE',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-  },
-  adminToggleText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    color: '#1E40AF',
-  },
-  requestCard: {
+  sectionTitle: { fontSize: typography.fontSize.md, fontWeight: typography.fontWeight.bold, color: '#0F172A' },
+  sectionSubtitle: { fontSize: typography.fontSize.xs, color: '#64748B', marginBottom: spacing.md },
+  adminToggleBtn: { backgroundColor: '#DBEAFE', paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full },
+  adminToggleText: { fontSize: typography.fontSize.xs, color: '#1E40AF', fontWeight: typography.fontWeight.bold },
+  requestsSection: { marginBottom: spacing.lg },
+  subSectionTitle: { fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold, color: '#1E3A8A', marginBottom: spacing.xs },
+  reqCard: { backgroundColor: '#FFFFFF', borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: '#E2E8F0' },
+  reqHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  reqDate: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold, color: '#0F172A' },
+  reqText: { fontSize: typography.fontSize.xs, color: '#475569', marginTop: 4 },
+  boldText: { fontWeight: typography.fontWeight.bold, color: '#1D4ED8' },
+  reqReason: { fontSize: typography.fontSize.xs, color: '#64748B', fontStyle: 'italic', marginTop: 2 },
+  adminActionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  adminBtn: { flex: 1, paddingVertical: 6, borderRadius: radius.sm, alignItems: 'center' },
+  approveBtn: { backgroundColor: '#10B981' },
+  rejectBtn: { backgroundColor: '#EF4444' },
+  adminBtnText: { color: '#FFFFFF', fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold },
+  dayCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    ...shadows.subtle,
   },
-  reqTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  dayCardToday: {
+    borderColor: '#3B82F6',
+    borderWidth: 2,
+    backgroundColor: '#F8FAFC',
   },
-  reqTarget: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    color: '#0F172A',
-    flex: 1,
+  dayCardSunday: {
+    backgroundColor: '#F1F5F9',
+    opacity: 0.8,
   },
-  reqReason: {
-    fontSize: typography.fontSize.xs,
-    color: '#475569',
-    marginTop: spacing.xs,
-    fontStyle: 'italic',
-  },
-  reqTime: {
-    fontSize: typography.fontSize.xxs,
-    color: '#94A3B8',
-    marginTop: 4,
-  },
-  adminActionRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: spacing.sm,
-  },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 7,
+  dayTopRow: { flexDirection: 'row', alignItems: 'center' },
+  dateCircle: {
+    width: 44,
+    height: 44,
     borderRadius: radius.md,
+    backgroundColor: '#EFF6FF',
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
-  approveBtn: {
-    backgroundColor: '#10B981',
-  },
-  rejectBtn: {
-    backgroundColor: '#EF4444',
-  },
-  actionBtnText: {
-    color: '#FFFFFF',
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-  },
-  routeItemCard: {
+  dayNum: { fontSize: typography.fontSize.md, fontWeight: typography.fontWeight.black, color: '#1D4ED8' },
+  dayNumToday: { color: '#2563EB' },
+  dayWk: { fontSize: typography.fontSize.xxs, color: '#64748B', fontWeight: typography.fontWeight.bold },
+  routeHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dayRouteName: { fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold, color: '#0F172A', flex: 1 },
+  dayRouteNameToday: { color: '#1D4ED8' },
+  dayMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 4 },
+  dayMetaText: { fontSize: typography.fontSize.xxs, color: '#64748B' },
+  jointTag: { backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.xs },
+  jointTagText: { fontSize: typography.fontSize.xxs, color: '#B45309', fontWeight: typography.fontWeight.bold },
+  dayFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#F8FAFC' },
+  districtTag: { fontSize: typography.fontSize.xxs, color: '#64748B' },
+  deviateBtn: { paddingVertical: 2 },
+  deviateBtnText: { fontSize: typography.fontSize.xs, color: '#2563EB', fontWeight: typography.fontWeight.bold },
+  masterBeatCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: radius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     ...shadows.subtle,
   },
-  routeItemCardActive: {
+  masterBeatCardActive: {
     borderColor: '#3B82F6',
     borderWidth: 1.5,
-    backgroundColor: '#F8FAFC',
   },
-  routeHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  routeCode: {
-    fontSize: typography.fontSize.xxs,
-    fontWeight: typography.fontWeight.bold,
-    color: '#64748B',
-  },
-  routeCodeActive: {
-    color: '#2563EB',
-  },
-  routeName: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    color: '#0F172A',
-    marginTop: 2,
-  },
-  areasTagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  areaTag: {
-    backgroundColor: '#F1F5F9',
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  areaTagText: {
-    fontSize: typography.fontSize.xxs,
-    color: '#475569',
-  },
-  routeFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: spacing.xs,
-  },
-  routeCoverage: {
-    fontSize: typography.fontSize.xs,
-    color: '#64748B',
-  },
-  switchText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    color: '#2563EB',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    ...shadows.floating,
-  },
-  modalTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: '#0F172A',
-  },
-  modalSubtitle: {
-    fontSize: typography.fontSize.xs,
-    color: '#2563EB',
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing.md,
-  },
-  inputLabel: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: '#475569',
-    marginBottom: spacing.xs,
-  },
-  reasonInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: radius.md,
-    padding: spacing.md,
-    fontSize: typography.fontSize.sm,
-    color: '#0F172A',
-    height: 90,
-    textAlignVertical: 'top',
-    marginBottom: spacing.lg,
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  modalBtn: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    alignItems: 'center',
-  },
-  modalCancelBtn: {
-    backgroundColor: '#F1F5F9',
-  },
-  modalCancelText: {
-    color: '#475569',
-    fontWeight: typography.fontWeight.semibold,
-  },
-  modalSubmitBtn: {
-    backgroundColor: '#3B82F6',
-  },
-  modalSubmitText: {
-    color: '#FFFFFF',
-    fontWeight: typography.fontWeight.bold,
-  },
+  beatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  beatCode: { fontSize: typography.fontSize.xxs, fontWeight: typography.fontWeight.bold, color: '#2563EB' },
+  beatName: { fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.bold, color: '#0F172A', marginTop: 2 },
+  beatDesc: { fontSize: typography.fontSize.xs, color: '#64748B', marginTop: spacing.xs, lineHeight: 18 },
+  areasTagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
+  areaChip: { backgroundColor: '#F1F5F9', borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  areaChipText: { fontSize: typography.fontSize.xxs, color: '#475569' },
+  beatFooter: { marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  beatStats: { fontSize: typography.fontSize.xs, color: '#1E3A8A', fontWeight: typography.fontWeight.semibold },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.5)', justifyContent: 'center', padding: spacing.lg },
+  modalCard: { backgroundColor: '#FFFFFF', borderRadius: radius.xl, padding: spacing.xl, ...shadows.floating },
+  modalTitle: { fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: '#0F172A' },
+  modalSubtitle: { fontSize: typography.fontSize.xs, color: '#2563EB', fontWeight: typography.fontWeight.semibold, marginBottom: spacing.md },
+  inputLabel: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold, color: '#475569', marginBottom: spacing.xs },
+  routePickerWrap: { marginBottom: spacing.md, maxHeight: 140 },
+  routePickerItem: { backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 4, borderWidth: 1, borderColor: '#E2E8F0' },
+  routePickerItemActive: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
+  routePickerText: { fontSize: typography.fontSize.xs, color: '#334155' },
+  routePickerTextActive: { color: '#1D4ED8', fontWeight: typography.fontWeight.bold },
+  reasonInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, padding: spacing.md, fontSize: typography.fontSize.sm, color: '#0F172A', height: 75, textAlignVertical: 'top', marginBottom: spacing.lg },
+  modalBtnRow: { flexDirection: 'row', gap: spacing.md },
+  modalBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: radius.md, alignItems: 'center' },
+  modalCancelBtn: { backgroundColor: '#F1F5F9' },
+  modalCancelText: { color: '#475569', fontWeight: typography.fontWeight.semibold },
+  modalSubmitBtn: { backgroundColor: '#3B82F6' },
+  modalSubmitText: { color: '#FFFFFF', fontWeight: typography.fontWeight.bold },
 });

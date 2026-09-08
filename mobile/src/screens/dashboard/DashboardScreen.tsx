@@ -16,7 +16,7 @@ import { DoctorService } from '../../services/doctorService';
 import { OrderService } from '../../services/orderService';
 import { SyncService } from '../../services/sync/syncService';
 import { BackgroundTelemetryManager } from '../../services/location/backgroundTelemetry';
-import { UserProfile, Doctor, RoutePlan } from '../../types';
+import { UserProfile, RoutePlan, MTPDayPlan } from '../../types';
 
 interface DashboardScreenProps {
   onNavigate: (screen: string, params?: any) => void;
@@ -29,6 +29,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 }) => {
   const [user, setUser] = useState<UserProfile | null>(AuthService.getCurrentUser());
   const [activeRoute, setActiveRoute] = useState<RoutePlan | null>(null);
+  const [todayMTP, setTodayMTP] = useState<MTPDayPlan | null>(null);
   const [isWorking, setIsWorking] = useState(true);
   const [startTimeText, setStartTimeText] = useState('07:57 AM');
   const [refreshing, setRefreshing] = useState(false);
@@ -39,6 +40,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     setUser(usr);
     const route = await RouteService.getActiveRoute();
     setActiveRoute(route);
+    const mtpDay = await RouteService.getTodayMTPDay();
+    setTodayMTP(mtpDay);
   };
 
   useEffect(() => {
@@ -85,30 +88,31 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Sky-Blue Header with Map Texture & Hamburger */}
+      {/* Sky-Blue Header Banner */}
       <View style={styles.headerBanner}>
-        {/* Top Header Row */}
+        {/* Top Header Row with Bulletproof Hamburger Button */}
         <View style={styles.headerTopRow}>
           <TouchableOpacity
             style={styles.hamburgerButton}
             onPress={onOpenDrawer}
-            activeOpacity={0.7}
+            activeOpacity={0.6}
+            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
           >
             <Text style={styles.hamburgerIcon}>☰</Text>
           </TouchableOpacity>
           <Text style={styles.appTitle}>RepPulse</Text>
-          <View style={{ width: 36 }} />
+          <View style={{ width: 44 }} />
         </View>
 
         {/* Central Circular Duty Status Card */}
-        <View style={styles.circularDutyWrapper}>
+        <View style={styles.circularDutyWrapper} pointerEvents="box-none">
           <View style={styles.outerRing}>
             <View style={styles.innerCircle}>
               <Text style={styles.dutyTimeText}>
                 {isWorking ? 'Since ' + startTimeText : 'Shift Offline'}
               </Text>
               <Text style={styles.dutyHqText} numberOfLines={1}>
-                {'📍 ' + (activeRoute ? activeRoute.name.split('-')[0].trim() : 'HQ - Silchar')}
+                {'📍 ' + (todayMTP ? todayMTP.routeName.split('-')[0].trim() : activeRoute ? activeRoute.name.split('-')[0].trim() : 'HQ - Silchar')}
               </Text>
               <TouchableOpacity
                 style={[styles.dutyToggleButton, !isWorking && styles.dutyToggleButtonStart]}
@@ -139,7 +143,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.tilesGrid}>
-          {/* Tile 1: VISITS */}
+          {/* Tile 1: VISITS (Lavender) */}
           <TouchableOpacity
             style={[styles.tileCard, { backgroundColor: colors.tileVisits }]}
             onPress={() => onNavigate('DOCTORS')}
@@ -151,7 +155,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.tileTitle}>VISITS</Text>
           </TouchableOpacity>
 
-          {/* Tile 2: CLIENTS */}
+          {/* Tile 2: CLIENTS (Pink) */}
           <TouchableOpacity
             style={[styles.tileCard, { backgroundColor: colors.tileClients }]}
             onPress={() => onNavigate('DOCTORS')}
@@ -163,7 +167,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.tileTitle}>CLIENTS</Text>
           </TouchableOpacity>
 
-          {/* Tile 3: FIRMS */}
+          {/* Tile 3: FIRMS (Mint Green) */}
           <TouchableOpacity
             style={[styles.tileCard, { backgroundColor: colors.tileFirms }]}
             onPress={() => onNavigate('FIRMS')}
@@ -175,7 +179,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.tileTitle}>FIRMS</Text>
           </TouchableOpacity>
 
-          {/* Tile 4: HOSPITALS */}
+          {/* Tile 4: HOSPITALS (Slate Lavender) */}
           <TouchableOpacity
             style={[styles.tileCard, { backgroundColor: colors.tileHospitals }]}
             onPress={() => onNavigate('HOSPITALS')}
@@ -187,7 +191,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.tileTitle}>HOSPITALS</Text>
           </TouchableOpacity>
 
-          {/* Tile 5: ROUTES & CALENDAR */}
+          {/* Tile 5: ROUTES & CALENDAR (Cyan) */}
           <TouchableOpacity
             style={[styles.tileCard, { backgroundColor: colors.tileRoutes }]}
             onPress={() => onNavigate('ROUTES')}
@@ -199,7 +203,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <Text style={styles.tileTitle}>ROUTES</Text>
           </TouchableOpacity>
 
-          {/* Tile 6: DCR / ORDERS */}
+          {/* Tile 6: DCR / ORDERS (Peach) */}
           <TouchableOpacity
             style={[styles.tileCard, { backgroundColor: colors.tileDCR }]}
             onPress={() => onNavigate('ORDERS')}
@@ -222,7 +226,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
         <TouchableOpacity
           style={styles.bottomAction}
-          onPress={() => Alert.alert('Assam Regional Support', 'Calling Helpline: 8448440654')}
+          onPress={() => Alert.alert('Assam Regional Support', 'Calling Regional Helpline: 8448440654')}
           activeOpacity={0.7}
         >
           <Text style={styles.bottomActionIcon}>📞</Text>
@@ -237,10 +241,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   headerBanner: {
     backgroundColor: '#93C5FD',
     paddingTop: spacing.md,
@@ -249,17 +250,24 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     position: 'relative',
+    zIndex: 1,
   },
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 99999,
   },
   hamburgerButton: {
     padding: spacing.xs,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99999,
   },
   hamburgerIcon: {
-    fontSize: 26,
+    fontSize: 28,
     color: '#FFFFFF',
     fontWeight: 'bold',
   },

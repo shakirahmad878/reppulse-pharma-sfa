@@ -1,213 +1,394 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { colors, typography, spacing, radius } from '../../constants/theme';
-import { Card } from '../../components/common/Card';
-import { Badge } from '../../components/common/Badge';
-import { Button } from '../../components/common/Button';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  SafeAreaView,
+  Alert,
+} from 'react-native';
+import { colors, typography, spacing, radius, shadows } from '../../constants/theme';
 import { AuthService } from '../../services/authService';
+import { RouteService } from '../../services/routeService';
 import { DoctorService } from '../../services/doctorService';
 import { OrderService } from '../../services/orderService';
 import { SyncService } from '../../services/sync/syncService';
-import { UserProfile, Doctor } from '../../types';
+import { BackgroundTelemetryManager } from '../../services/location/backgroundTelemetry';
+import { UserProfile, Doctor, RoutePlan } from '../../types';
 
 interface DashboardScreenProps {
   onNavigate: (screen: string, params?: any) => void;
+  onOpenDrawer: () => void;
 }
 
-export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigate }) => {
+export const DashboardScreen: React.FC<DashboardScreenProps> = ({
+  onNavigate,
+  onOpenDrawer,
+}) => {
   const [user, setUser] = useState<UserProfile | null>(AuthService.getCurrentUser());
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [pobTotal, setPobTotal] = useState(5839.79);
-  const [orderCount, setOrderCount] = useState(1);
-  const [isPunchedIn, setIsPunchedIn] = useState(false);
+  const [activeRoute, setActiveRoute] = useState<RoutePlan | null>(null);
+  const [isWorking, setIsWorking] = useState(true);
+  const [startTimeText, setStartTimeText] = useState('07:57 AM');
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
-  const loadData = async () => {
-    const docs = await DoctorService.getDoctors();
-    setDoctors(docs);
-    const orders = await OrderService.getOrders();
-    if (orders.length > 0) {
-      setOrderCount(orders.length);
-      const sum = orders.reduce((acc, o) => acc + o.grandTotal, 0);
-      setPobTotal(sum);
-    }
+  const loadDashboardData = async () => {
+    const usr = AuthService.getCurrentUser();
+    setUser(usr);
+    const route = await RouteService.getActiveRoute();
+    setActiveRoute(route);
   };
 
   useEffect(() => {
-    loadData();
+    loadDashboardData();
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await loadDashboardData();
     setRefreshing(false);
   };
 
-  const completedVisits = doctors.filter(d => d.todayVisitStatus === 'COMPLETED').length;
-  const pendingVisits = doctors.filter(d => d.todayVisitStatus === 'PENDING').length;
+  const toggleDuty = async () => {
+    if (isWorking) {
+      Alert.alert(
+        'Stop Field Duty?',
+        'This will mark your attendance punch-out and pause 15-minute background location telemetry.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Stop Working',
+            style: 'destructive',
+            onPress: async () => {
+              await BackgroundTelemetryManager.stopTracking();
+              setIsWorking(false);
+            },
+          },
+        ]
+      );
+    } else {
+      onNavigate('ATTENDANCE');
+    }
+  };
+
+  const handleQuickSync = async () => {
+    setSyncing(true);
+    const result = await SyncService.syncAll();
+    setSyncing(false);
+    Alert.alert(
+      result.success ? 'Sync Complete' : 'Sync Notice',
+      result.message || 'All offline records synchronized with Assam regional cloud servers.'
+    );
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
-    >
-      {/* Representative Header Brief */}
-      <View style={styles.repHeader}>
-        <View>
-          <Text style={styles.greeting}>Good Morning,</Text>
-          <Text style={styles.repName}>{user?.name || 'Vikram Mehta'}</Text>
-          <Text style={styles.repTerritory}>📍 {user?.territory || 'Bandra West & Khar Zone'}</Text>
-        </View>
-        <Badge label={isPunchedIn ? 'On Duty' : 'Standby'} variant={isPunchedIn ? 'success' : 'warning'} />
-      </View>
-
-      {/* Attendance & Shift Card */}
-      <Card style={styles.shiftCard}>
-        <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>Daily Attendance & Telemetry</Text>
-          <Text style={styles.telemetryTag}>⏱️ 15-Min GPS Active</Text>
-        </View>
-        <Text style={styles.cardDesc}>
-          Punch in with a geotagged selfie to start automated 15-minute background location telemetry.
-        </Text>
-        <Button
-          title={isPunchedIn ? "✓ Shift Active (View Attendance)" : "🤳 Geotagged Selfie Punch In"}
-          onPress={() => onNavigate('ATTENDANCE')}
-          variant={isPunchedIn ? "secondary" : "primary"}
-        />
-      </Card>
-
-      {/* Primary KPI Metrics Grid */}
-      <View style={styles.metricsGrid}>
-        <TouchableOpacity style={styles.metricCard} onPress={() => onNavigate('DOCTORS')}>
-          <Text style={styles.metricNumber}>{doctors.length}</Text>
-          <Text style={styles.metricLabel}>Assigned Doctors</Text>
-          <Text style={styles.metricSub}>{completedVisits} Completed • {pendingVisits} Pending</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.metricCard} onPress={() => onNavigate('ORDERS')}>
-          <Text style={styles.metricNumber}>₹{Math.round(pobTotal).toLocaleString()}</Text>
-          <Text style={styles.metricLabel}>Today's POB Value</Text>
-          <Text style={styles.metricSub}>{orderCount} Chemist Orders</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Action Shortcuts */}
-      <Text style={styles.sectionTitle}>Field Operations</Text>
-      <View style={styles.actionsGrid}>
-        <TouchableOpacity style={styles.actionTile} onPress={() => onNavigate('DOCTORS')}>
-          <Text style={styles.actionIcon}>👨‍⚕️</Text>
-          <Text style={styles.actionTitle}>Doctor Directory</Text>
-          <Text style={styles.actionSub}>Check-in & geofence</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionTile} onPress={() => onNavigate('ORDERS')}>
-          <Text style={styles.actionIcon}>💊</Text>
-          <Text style={styles.actionTitle}>Book POB Order</Text>
-          <Text style={styles.actionSub}>Secondary sales</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionTile} onPress={() => onNavigate('SYNC')}>
-          <Text style={styles.actionIcon}>🔄</Text>
-          <Text style={styles.actionTitle}>Sync Center</Text>
-          <Text style={styles.actionSub}>Offline records</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionTile} onPress={() => onNavigate('PROFILE')}>
-          <Text style={styles.actionIcon}>👤</Text>
-          <Text style={styles.actionTitle}>Rep Profile</Text>
-          <Text style={styles.actionSub}>Battery & privacy</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Today's Doctor Call List Quick View */}
-      <View style={styles.todayVisitsHeader}>
-        <Text style={styles.sectionTitle}>Today's Clinic Targets</Text>
-        <TouchableOpacity onPress={() => onNavigate('DOCTORS')}>
-          <Text style={styles.viewAllText}>View All ›</Text>
-        </TouchableOpacity>
-      </View>
-
-      {doctors.slice(0, 3).map((doc) => (
-        <Card key={doc.id} style={styles.doctorItemCard}>
-          <View style={styles.docRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.docName}>{doc.name}</Text>
-              <Text style={styles.docSpecialty}>{doc.specialty} • {doc.clinicName}</Text>
-              <Text style={styles.docArea}>📍 {doc.area} (100m Geofence)</Text>
-            </View>
-            <Badge
-              label={doc.todayVisitStatus}
-              variant={doc.todayVisitStatus === 'COMPLETED' ? 'success' : 'warning'}
-            />
-          </View>
+    <SafeAreaView style={styles.container}>
+      {/* Sky-Blue Header with Map Texture & Hamburger */}
+      <View style={styles.headerBanner}>
+        {/* Top Header Row */}
+        <View style={styles.headerTopRow}>
           <TouchableOpacity
-            style={styles.docVisitBtn}
-            onPress={() => onNavigate('DOCTOR_DETAILS', { doctorId: doc.id })}
+            style={styles.hamburgerButton}
+            onPress={onOpenDrawer}
+            activeOpacity={0.7}
           >
-            <Text style={styles.docVisitBtnText}>Start Clinic Visit ›</Text>
+            <Text style={styles.hamburgerIcon}>☰</Text>
           </TouchableOpacity>
-        </Card>
-      ))}
-    </ScrollView>
+          <Text style={styles.appTitle}>RepPulse</Text>
+          <View style={{ width: 36 }} />
+        </View>
+
+        {/* Central Circular Duty Status Card */}
+        <View style={styles.circularDutyWrapper}>
+          <View style={styles.outerRing}>
+            <View style={styles.innerCircle}>
+              <Text style={styles.dutyTimeText}>
+                {isWorking ? 'Since ' + startTimeText : 'Shift Offline'}
+              </Text>
+              <Text style={styles.dutyHqText} numberOfLines={1}>
+                {'📍 ' + (activeRoute ? activeRoute.name.split('-')[0].trim() : 'HQ - Silchar')}
+              </Text>
+              <TouchableOpacity
+                style={[styles.dutyToggleButton, !isWorking && styles.dutyToggleButtonStart]}
+                onPress={toggleDuty}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.dutyToggleText,
+                    !isWorking && styles.dutyToggleTextStart,
+                  ]}
+                >
+                  {isWorking ? 'Stop Working' : 'Start Working'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Main Feature Tiles Grid (2 Columns, 6 Pastel Tiles) */}
+      <ScrollView
+        style={styles.tilesScrollView}
+        contentContainerStyle={styles.tilesContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.tilesGrid}>
+          {/* Tile 1: VISITS */}
+          <TouchableOpacity
+            style={[styles.tileCard, { backgroundColor: colors.tileVisits }]}
+            onPress={() => onNavigate('DOCTORS')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.tileIconContainer}>
+              <Text style={styles.tileEmoji}>📄</Text>
+            </View>
+            <Text style={styles.tileTitle}>VISITS</Text>
+          </TouchableOpacity>
+
+          {/* Tile 2: CLIENTS */}
+          <TouchableOpacity
+            style={[styles.tileCard, { backgroundColor: colors.tileClients }]}
+            onPress={() => onNavigate('DOCTORS')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.tileIconContainer}>
+              <Text style={styles.tileEmoji}>👥</Text>
+            </View>
+            <Text style={styles.tileTitle}>CLIENTS</Text>
+          </TouchableOpacity>
+
+          {/* Tile 3: FIRMS */}
+          <TouchableOpacity
+            style={[styles.tileCard, { backgroundColor: colors.tileFirms }]}
+            onPress={() => onNavigate('FIRMS')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.tileIconContainer}>
+              <Text style={styles.tileEmoji}>🏢</Text>
+            </View>
+            <Text style={styles.tileTitle}>FIRMS</Text>
+          </TouchableOpacity>
+
+          {/* Tile 4: HOSPITALS */}
+          <TouchableOpacity
+            style={[styles.tileCard, { backgroundColor: colors.tileHospitals }]}
+            onPress={() => onNavigate('HOSPITALS')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.tileIconContainer}>
+              <Text style={styles.tileEmoji}>🏥</Text>
+            </View>
+            <Text style={styles.tileTitle}>HOSPITALS</Text>
+          </TouchableOpacity>
+
+          {/* Tile 5: ROUTES & CALENDAR */}
+          <TouchableOpacity
+            style={[styles.tileCard, { backgroundColor: colors.tileRoutes }]}
+            onPress={() => onNavigate('ROUTES')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.tileIconContainer}>
+              <Text style={styles.tileEmoji}>📅</Text>
+            </View>
+            <Text style={styles.tileTitle}>ROUTES</Text>
+          </TouchableOpacity>
+
+          {/* Tile 6: DCR / ORDERS */}
+          <TouchableOpacity
+            style={[styles.tileCard, { backgroundColor: colors.tileDCR }]}
+            onPress={() => onNavigate('ORDERS')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.tileIconContainer}>
+              <Text style={styles.tileEmoji}>📑</Text>
+            </View>
+            <Text style={styles.tileTitle}>ORDERS</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Bottom Bar: Synchronize & Support 8448440654 */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity style={styles.bottomAction} onPress={handleQuickSync} activeOpacity={0.7}>
+          <Text style={styles.bottomActionIcon}>{syncing ? '⏳' : '🔄'}</Text>
+          <Text style={styles.bottomActionText}>Synchronize</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.bottomAction}
+          onPress={() => Alert.alert('Assam Regional Support', 'Calling Helpline: 8448440654')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.bottomActionIcon}>📞</Text>
+          <View>
+            <Text style={styles.bottomActionText}>Support</Text>
+            <Text style={styles.bottomPhoneText}>8448440654</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  repHeader: {
-    backgroundColor: colors.surface,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  headerBanner: {
+    backgroundColor: '#93C5FD',
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 60,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    position: 'relative',
+  },
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  greeting: { color: colors.textSecondary, fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.semibold },
-  repName: { color: colors.textPrimary, fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.black },
-  repTerritory: { color: colors.primaryDark, fontSize: typography.fontSize.xs, marginTop: 2, fontWeight: typography.fontWeight.medium },
-  shiftCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs },
-  cardTitle: { color: colors.textPrimary, fontSize: typography.fontSize.md, fontWeight: typography.fontWeight.bold },
-  telemetryTag: { color: colors.primary, fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold },
-  cardDesc: { color: colors.textSecondary, fontSize: typography.fontSize.sm, marginBottom: spacing.md, lineHeight: 18 },
-  metricsGrid: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
-  metricCard: {
+  hamburgerButton: {
+    padding: spacing.xs,
+  },
+  hamburgerIcon: {
+    fontSize: 26,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  appTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  circularDutyWrapper: {
+    position: 'absolute',
+    bottom: -50,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  outerRing: {
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: '#60A5FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.card,
+  },
+  innerCircle: {
+    width: 146,
+    height: 146,
+    borderRadius: 73,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  dutyTimeText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  dutyHqText: {
+    fontSize: typography.fontSize.xs + 1,
+    color: '#2563EB',
+    fontWeight: typography.fontWeight.bold,
+    marginVertical: 3,
+    textAlign: 'center',
+  },
+  dutyToggleButton: {
+    marginTop: 2,
+    paddingVertical: 3,
+    paddingHorizontal: spacing.sm,
+  },
+  dutyToggleButtonStart: {
+    backgroundColor: colors.success,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+  },
+  dutyToggleText: {
+    fontSize: typography.fontSize.xs,
+    color: '#475569',
+    fontWeight: typography.fontWeight.semibold,
+  },
+  dutyToggleTextStart: {
+    color: '#FFFFFF',
+    fontWeight: typography.fontWeight.bold,
+  },
+  tilesScrollView: {
     flex: 1,
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    marginTop: 60,
   },
-  metricNumber: { color: colors.textPrimary, fontSize: typography.fontSize.xxl, fontWeight: typography.fontWeight.black },
-  metricLabel: { color: colors.textSecondary, fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold, marginTop: 2 },
-  metricSub: { color: colors.primaryDark, fontSize: typography.fontSize.xs, marginTop: 4 },
-  sectionTitle: { color: colors.textPrimary, fontSize: typography.fontSize.md, fontWeight: typography.fontWeight.bold, marginBottom: spacing.sm },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  actionTile: {
-    width: '48%',
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+  tilesContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
-  actionIcon: { fontSize: 24, marginBottom: spacing.xs },
-  actionTitle: { color: colors.textPrimary, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold },
-  actionSub: { color: colors.textMuted, fontSize: typography.fontSize.xs, marginTop: 2 },
-  todayVisitsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs },
-  viewAllText: { color: colors.primary, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold },
-  doctorItemCard: { marginBottom: spacing.sm },
-  docRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  docName: { color: colors.textPrimary, fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.bold },
-  docSpecialty: { color: colors.textSecondary, fontSize: typography.fontSize.xs, marginTop: 2 },
-  docArea: { color: colors.textMuted, fontSize: typography.fontSize.xs, marginTop: 2 },
-  docVisitBtn: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.surfaceSecondary, alignItems: 'flex-end' },
-  docVisitBtnText: { color: colors.primary, fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold },
+  tilesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  tileCard: {
+    width: '47.5%',
+    height: 120,
+    borderRadius: radius.tile,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.subtle,
+  },
+  tileIconContainer: {
+    marginBottom: spacing.xs,
+  },
+  tileEmoji: {
+    fontSize: 32,
+  },
+  tileTitle: {
+    fontSize: typography.fontSize.xs + 1,
+    fontWeight: typography.fontWeight.bold,
+    color: '#475569',
+    letterSpacing: 0.8,
+  },
+  bottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  bottomAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  bottomActionIcon: {
+    fontSize: 20,
+    color: '#2563EB',
+  },
+  bottomActionText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: '#1E3A8A',
+  },
+  bottomPhoneText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#1D4ED8',
+  },
 });

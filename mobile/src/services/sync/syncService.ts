@@ -49,6 +49,11 @@ export class SyncService {
     };
   }
 
+  public static async syncAll(): Promise<{ success: boolean; message: string }> {
+    const res = await this.processQueue();
+    return { success: res.failedCount === 0, message: 'Processed ' + res.processedCount + ' records successfully.' };
+  }
+
   public static async processQueue(): Promise<{ processedCount: number; failedCount: number }> {
     if (this.isSyncing) return { processedCount: 0, failedCount: 0 };
     this.isSyncing = true;

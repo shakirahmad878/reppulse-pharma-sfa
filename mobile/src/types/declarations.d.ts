@@ -12,8 +12,15 @@ declare module 'react-native' {
   export const BackHandler: any;
   export const ActivityIndicator: any;
   export const RefreshControl: any;
+  export const Modal: any;
+  export const TouchableWithoutFeedback: any;
+  export const Dimensions: any;
+  export const ToastAndroid: any;
+  export const Platform: any;
+  export const Linking: any;
   export type TextInputProps = any;
   export type ViewStyle = any;
+  export type TextStyle = any;
 }
 
 declare module 'expo-location' {

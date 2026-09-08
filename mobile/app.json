@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "SefMed Mobile SFA",
-    "slug": "sefmed-pharma-sfa",
+    "name": "RepPulse",
+    "slug": "reppulse-pharma-sfa",
     "owner": "shakir878",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -26,8 +26,8 @@
       }
     },
     "android": {
-      "package": "com.sefmed.sfa",
-      "versionCode": 1,
+      "package": "com.reppulse.sfa",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F172A"
@@ -52,13 +52,13 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow SefMed to log 15-minute periodic location fixes during field duty."
+          "locationAlwaysAndWhenInUsePermission": "Allow RepPulse to log 15-minute periodic location fixes during field duty in Barak Division."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow SefMed to capture geotagged selfie attendance punch-ins."
+          "cameraPermission": "Allow RepPulse to capture geotagged selfie attendance punch-ins."
         }
       ]
     ],

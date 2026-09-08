@@ -1,8 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, BackHandler, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  BackHandler,
+  ActivityIndicator,
+  ToastAndroid,
+  Platform,
+} from 'react-native';
 import { colors, typography, spacing } from '../constants/theme';
 import { AuthService } from '../services/authService';
 import { NetworkBanner } from '../components/common/NetworkBanner';
+import { DrawerMenu } from '../components/navigation/DrawerMenu';
+
+// Screens
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
 import { AttendanceScreen } from '../screens/attendance/AttendanceScreen';
@@ -12,7 +24,13 @@ import { VisitExecutionScreen } from '../screens/visits/VisitExecutionScreen';
 import { POBBookingScreen } from '../screens/orders/POBBookingScreen';
 import { SyncCenterScreen } from '../screens/sync/SyncCenterScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
-import { Doctor } from '../types';
+import { RoutePlanScreen } from '../screens/routes/RoutePlanScreen';
+import { HospitalDirectoryScreen } from '../screens/hospitals/HospitalDirectoryScreen';
+import { FirmDirectoryScreen } from '../screens/firms/FirmDirectoryScreen';
+import { CommandsScreen } from '../screens/commands/CommandsScreen';
+import { AuxScreen } from '../screens/auxiliary/AuxScreens';
+
+import { Doctor, UserProfile } from '../types';
 
 export type ScreenName =
   | 'LOGIN'
@@ -21,52 +39,122 @@ export type ScreenName =
   | 'DOCTORS'
   | 'DOCTOR_DETAILS'
   | 'VISIT_EXECUTION'
+  | 'VISIT_EXECUTION_LIST'
   | 'ORDERS'
   | 'SYNC'
-  | 'PROFILE';
+  | 'PROFILE'
+  | 'ROUTES'
+  | 'HOSPITALS'
+  | 'FIRMS'
+  | 'COMMANDS'
+  | 'NOTIFICATIONS'
+  | 'EXPENSES'
+  | 'LEAVES'
+  | 'FILES';
+
+interface StackEntry {
+  screen: ScreenName;
+  params?: any;
+}
 
 export const RootNavigator: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('DASHBOARD');
-  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'DOCTORS' | 'ORDERS' | 'SYNC' | 'PROFILE'>('DASHBOARD');
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
-  const [visitContext, setVisitContext] = useState<{ doctor: Doctor; isGeofenceOk: boolean; distanceMeters: number } | null>(null);
+  const [currentParams, setCurrentParams] = useState<any>(null);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+
+  // Explicit LIFO Navigation History Stack to fix the Auto-Back bug permanently
+  const historyRef = useRef<StackEntry[]>([]);
+  const lastBackPressRef = useRef<number>(0);
 
   useEffect(() => {
     AuthService.restoreSession().then(user => {
       setIsAuthenticated(!!user);
+      setCurrentUser(user);
     });
+  }, []);
 
-    const backAction = () => {
-      if (currentScreen !== 'DASHBOARD' && isAuthenticated) {
-        navigate(activeTab);
+  // Hardware Back Button Handler
+  useEffect(() => {
+    const onHardwareBack = () => {
+      if (drawerVisible) {
+        setDrawerVisible(false);
         return true;
       }
-      return false;
+
+      if (!isAuthenticated) return false;
+
+      // If we have screen history to pop
+      if (historyRef.current.length > 0) {
+        pop();
+        return true;
+      }
+
+      // If we are on DASHBOARD with empty history, double-tap to exit
+      if (currentScreen === 'DASHBOARD') {
+        const now = Date.now();
+        if (now - lastBackPressRef.current < 2000) {
+          BackHandler.exitApp();
+          return false;
+        }
+        lastBackPressRef.current = now;
+        if (Platform.OS === 'android') {
+          ToastAndroid.show('Press back again to exit RepPulse', ToastAndroid.SHORT);
+        }
+        return true;
+      }
+
+      // Fallback: Return to Dashboard
+      replace('DASHBOARD');
+      return true;
     };
 
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-    return () => backHandler.remove();
-  }, [currentScreen, activeTab, isAuthenticated]);
+    const handler = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+    return () => handler.remove();
+  }, [currentScreen, isAuthenticated, drawerVisible]);
 
-  const navigate = (screen: ScreenName, params?: any) => {
-    if (['DASHBOARD', 'DOCTORS', 'ORDERS', 'SYNC', 'PROFILE'].includes(screen)) {
-      setActiveTab(screen as any);
+  const push = (screen: ScreenName, params?: any) => {
+    if (screen === currentScreen && JSON.stringify(params) === JSON.stringify(currentParams)) {
+      return;
     }
-    if (screen === 'DOCTOR_DETAILS' && params?.doctorId) {
-      setSelectedDoctorId(params.doctorId);
-    }
-    if (screen === 'VISIT_EXECUTION' && params) {
-      setVisitContext(params);
-    }
+    historyRef.current.push({ screen: currentScreen, params: currentParams });
     setCurrentScreen(screen);
+    setCurrentParams(params || null);
+  };
+
+  const pop = () => {
+    if (historyRef.current.length > 0) {
+      const prev = historyRef.current.pop();
+      if (prev) {
+        setCurrentScreen(prev.screen);
+        setCurrentParams(prev.params || null);
+      }
+    } else {
+      setCurrentScreen('DASHBOARD');
+      setCurrentParams(null);
+    }
+  };
+
+  const replace = (screen: ScreenName, params?: any) => {
+    historyRef.current = [];
+    setCurrentScreen(screen);
+    setCurrentParams(params || null);
+  };
+
+  const handleNavigate = (screen: string, params?: any) => {
+    if (screen === 'DASHBOARD') {
+      replace('DASHBOARD');
+      return;
+    }
+    push(screen as ScreenName, params);
   };
 
   if (isAuthenticated === null) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Initializing SefMed Enterprise SFA...</Text>
+        <Text style={styles.loadingText}>Initializing RepPulse Enterprise SFA...</Text>
       </View>
     );
   }
@@ -76,9 +164,10 @@ export const RootNavigator: React.FC = () => {
       <LoginScreen
         onLoginSuccess={() => {
           setIsAuthenticated(true);
-          navigate('DASHBOARD');
+          setCurrentUser(AuthService.getCurrentUser());
+          replace('DASHBOARD');
         }}
-        onForgotPassword={() => alert('Password reset link sent to your registered manager.')}
+        onForgotPassword={() => alert('Password reset link sent to your registered regional manager.')}
       />
     );
   }
@@ -87,104 +176,166 @@ export const RootNavigator: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <NetworkBanner />
 
-      {/* Screen Router */}
+      {/* Slide-in Drawer Menu matching Screenshot 2 */}
+      <DrawerMenu
+        visible={drawerVisible}
+        user={currentUser}
+        activeScreen={currentScreen}
+        onClose={() => setDrawerVisible(false)}
+        onNavigate={handleNavigate}
+        onLogout={() => {
+          AuthService.logout().then(() => {
+            setIsAuthenticated(false);
+            setCurrentUser(null);
+          });
+        }}
+      />
+
+      {/* Screen Viewport */}
       <View style={styles.screenContainer}>
-        {currentScreen === 'DASHBOARD' && <DashboardScreen onNavigate={navigate} />}
-        {currentScreen === 'ATTENDANCE' && <AttendanceScreen onBack={() => navigate('DASHBOARD')} />}
-        {currentScreen === 'DOCTORS' && (
-          <DoctorListScreen
-            onBack={() => navigate('DASHBOARD')}
-            onSelectDoctor={docId => navigate('DOCTOR_DETAILS', { doctorId: docId })}
+        {currentScreen === 'DASHBOARD' && (
+          <DashboardScreen
+            onNavigate={handleNavigate}
+            onOpenDrawer={() => setDrawerVisible(true)}
           />
         )}
-        {currentScreen === 'DOCTOR_DETAILS' && selectedDoctorId && (
+
+        {currentScreen === 'ATTENDANCE' && (
+          <AttendanceScreen onBack={pop} />
+        )}
+
+        {currentScreen === 'DOCTORS' && (
+          <DoctorListScreen
+            onBack={pop}
+            onOpenDrawer={() => setDrawerVisible(true)}
+            onSelectDoctor={docId => push('DOCTOR_DETAILS', { doctorId: docId })}
+          />
+        )}
+
+        {currentScreen === 'DOCTOR_DETAILS' && currentParams?.doctorId && (
           <DoctorDetailsScreen
-            doctorId={selectedDoctorId}
-            onBack={() => navigate('DOCTORS')}
+            doctorId={currentParams.doctorId}
+            onBack={pop}
             onStartVisit={(doc, ok, dist) =>
-              navigate('VISIT_EXECUTION', { doctor: doc, isGeofenceOk: ok, distanceMeters: dist })
+              push('VISIT_EXECUTION', { doctor: doc, isGeofenceOk: ok, distanceMeters: dist })
             }
           />
         )}
-        {currentScreen === 'VISIT_EXECUTION' && visitContext && (
+
+        {currentScreen === 'VISIT_EXECUTION' && currentParams && (
           <VisitExecutionScreen
-            doctor={visitContext.doctor}
-            isGeofenceVerified={visitContext.isGeofenceOk}
-            distanceMeters={visitContext.distanceMeters}
-            onBack={() => navigate('DOCTORS')}
-            onVisitComplete={() => navigate('DASHBOARD')}
+            doctor={currentParams.doctor}
+            isGeofenceVerified={currentParams.isGeofenceOk}
+            distanceMeters={currentParams.distanceMeters}
+            onBack={pop}
+            onVisitComplete={() => replace('DASHBOARD')}
           />
         )}
+
+        {currentScreen === 'VISIT_EXECUTION_LIST' && (
+          <DoctorListScreen
+            onBack={pop}
+            onOpenDrawer={() => setDrawerVisible(true)}
+            onSelectDoctor={docId => push('DOCTOR_DETAILS', { doctorId: docId })}
+          />
+        )}
+
         {currentScreen === 'ORDERS' && (
-          <POBBookingScreen onBack={() => navigate('DASHBOARD')} onOrderSuccess={() => navigate('DASHBOARD')} />
+          <POBBookingScreen
+            onBack={pop}
+            onOrderSuccess={() => replace('DASHBOARD')}
+          />
         )}
-        {currentScreen === 'SYNC' && <SyncCenterScreen onBack={() => navigate('DASHBOARD')} />}
+
+        {currentScreen === 'ROUTES' && (
+          <RoutePlanScreen onBack={pop} />
+        )}
+
+        {currentScreen === 'HOSPITALS' && (
+          <HospitalDirectoryScreen onBack={pop} />
+        )}
+
+        {currentScreen === 'FIRMS' && (
+          <FirmDirectoryScreen onBack={pop} />
+        )}
+
+        {currentScreen === 'COMMANDS' && (
+          <CommandsScreen onBack={pop} />
+        )}
+
+        {currentScreen === 'SYNC' && (
+          <SyncCenterScreen onBack={pop} />
+        )}
+
         {currentScreen === 'PROFILE' && (
-          <ProfileScreen onBack={() => navigate('DASHBOARD')} onLogout={() => setIsAuthenticated(false)} />
+          <ProfileScreen
+            onBack={pop}
+            onLogout={() => {
+              AuthService.logout().then(() => {
+                setIsAuthenticated(false);
+                setCurrentUser(null);
+              });
+            }}
+          />
         )}
-      </View>
 
-      {/* Bottom Navigation Bar */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'DASHBOARD' && styles.tabButtonActive]}
-          onPress={() => navigate('DASHBOARD')}
-        >
-          <Text style={styles.tabIcon}>🏠</Text>
-          <Text style={[styles.tabLabel, activeTab === 'DASHBOARD' && styles.tabLabelActive]}>Home</Text>
-        </TouchableOpacity>
+        {currentScreen === 'EXPENSES' && (
+          <AuxScreen
+            title="Daily Expenses & TA/DA"
+            subtitle="Barak Division Allowance Claims"
+            onBack={pop}
+            type="EXPENSES"
+          />
+        )}
 
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'DOCTORS' && styles.tabButtonActive]}
-          onPress={() => navigate('DOCTORS')}
-        >
-          <Text style={styles.tabIcon}>👨‍⚕️</Text>
-          <Text style={[styles.tabLabel, activeTab === 'DOCTORS' && styles.tabLabelActive]}>Doctors</Text>
-        </TouchableOpacity>
+        {currentScreen === 'LEAVES' && (
+          <AuxScreen
+            title="Leave Management"
+            subtitle="Casual & Sick Leave Balance"
+            onBack={pop}
+            type="LEAVES"
+          />
+        )}
 
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'ORDERS' && styles.tabButtonActive]}
-          onPress={() => navigate('ORDERS')}
-        >
-          <Text style={styles.tabIcon}>💊</Text>
-          <Text style={[styles.tabLabel, activeTab === 'ORDERS' && styles.tabLabelActive]}>Orders</Text>
-        </TouchableOpacity>
+        {currentScreen === 'FILES' && (
+          <AuxScreen
+            title="Product Literature"
+            subtitle="Visual Aids & Clinical Brochures"
+            onBack={pop}
+            type="FILES"
+          />
+        )}
 
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'SYNC' && styles.tabButtonActive]}
-          onPress={() => navigate('SYNC')}
-        >
-          <Text style={styles.tabIcon}>🔄</Text>
-          <Text style={[styles.tabLabel, activeTab === 'SYNC' && styles.tabLabelActive]}>Sync</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'PROFILE' && styles.tabButtonActive]}
-          onPress={() => navigate('PROFILE')}
-        >
-          <Text style={styles.tabIcon}>👤</Text>
-          <Text style={[styles.tabLabel, activeTab === 'PROFILE' && styles.tabLabelActive]}>Profile</Text>
-        </TouchableOpacity>
+        {currentScreen === 'NOTIFICATIONS' && (
+          <AuxScreen
+            title="Field Notifications"
+            subtitle="Regional HQ Announcements"
+            onBack={pop}
+            type="NOTIFICATIONS"
+          />
+        )}
       </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  loadingText: { color: colors.textSecondary, fontSize: typography.fontSize.sm, marginTop: spacing.md },
-  screenContainer: { flex: 1 },
-  bottomBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingVertical: spacing.xs + 2,
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
-  tabButton: { flex: 1, alignItems: 'center', paddingVertical: spacing.xs },
-  tabButtonActive: { borderTopWidth: 2, borderTopColor: colors.primary, marginTop: -2 },
-  tabIcon: { fontSize: 20 },
-  tabLabel: { color: colors.textSecondary, fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.semibold, marginTop: 2 },
-  tabLabelActive: { color: colors.primary, fontWeight: typography.fontWeight.bold },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.md,
+  },
+  screenContainer: {
+    flex: 1,
+  },
 });

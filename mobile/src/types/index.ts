@@ -1,5 +1,5 @@
 /**
- * SefMed Pro Mobile SFA - Core Domain Types
+ * RepPulse Mobile SFA - Core Domain Types (Barak Division, Assam)
  */
 
 export type UserRole = 'SUPER_ADMIN' | 'REGIONAL_MANAGER' | 'AREA_MANAGER' | 'MEDICAL_REP' | 'CHEMIST';
@@ -14,6 +14,8 @@ export interface UserProfile {
   headquarter: string;
   phone?: string;
   token?: string;
+  assignedRouteIds: string[];
+  activeRouteId?: string;
 }
 
 export type GeofenceStatus =
@@ -24,6 +26,67 @@ export type GeofenceStatus =
   | 'CHECKED_IN'
   | 'CHECKED_OUT';
 
+export interface RoutePlan {
+  id: string;
+  code: string;
+  name: string;
+  district: 'Cachar' | 'Karimganj' | 'Hailakandi';
+  areas: string[];
+  totalDoctors: number;
+  totalHospitals: number;
+  totalChemists: number;
+  isAssigned: boolean;
+  isActiveToday: boolean;
+  description: string;
+}
+
+export type RouteApprovalStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+
+export interface RouteChangeRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  currentRouteId: string;
+  currentRouteName: string;
+  requestedRouteId: string;
+  requestedRouteName: string;
+  reason: string;
+  requestTimestamp: string;
+  status: RouteApprovalStatus;
+  reviewedBy?: string;
+  reviewedTimestamp?: string;
+  reviewComment?: string;
+}
+
+export interface Hospital {
+  id: string;
+  name: string;
+  type: 'GOVERNMENT_MEDICAL_COLLEGE' | 'CIVIL_HOSPITAL' | 'PRIVATE_HOSPITAL' | 'NURSING_HOME';
+  district: string;
+  area: string;
+  address: string;
+  bedCount: number;
+  keyDoctorsCount: number;
+  latitude: number;
+  longitude: number;
+  phone: string;
+  routeId: string;
+}
+
+export interface StockistFirm {
+  id: string;
+  name: string;
+  contactPerson: string;
+  type: 'SUPER_STOCKIST' | 'AUTHORIZED_DISTRIBUTOR' | 'WHOLESALE_PHARMA';
+  dlNumber: string;
+  gstNumber: string;
+  district: string;
+  area: string;
+  address: string;
+  phone: string;
+  routeId: string;
+}
+
 export interface Doctor {
   id: string;
   name: string;
@@ -32,7 +95,9 @@ export interface Doctor {
   tier: 'A_PLUS' | 'A' | 'B' | 'C';
   clinicName: string;
   clinicAddress: string;
+  district: 'Cachar' | 'Karimganj' | 'Hailakandi';
   area: string;
+  routeId: string;
   latitude: number;
   longitude: number;
   geofenceRadiusMeters: number; // default: 100m
@@ -41,6 +106,7 @@ export interface Doctor {
   completedVisitsThisMonth: number;
   todayVisitStatus: 'PENDING' | 'CHECKED_IN' | 'COMPLETED' | 'MISSED';
   lastVisitDate?: string;
+  isAssignedToMe: boolean;
 }
 
 export interface Chemist {
@@ -49,7 +115,9 @@ export interface Chemist {
   contactPerson: string;
   drugLicenseNumber: string;
   gstNumber?: string;
+  district: 'Cachar' | 'Karimganj' | 'Hailakandi';
   area: string;
+  routeId: string;
   phone: string;
   latitude: number;
   longitude: number;
@@ -80,13 +148,15 @@ export type VisitStatus =
   | 'SYNCED';
 
 export interface VisitRecord {
-  id: string; // Local UUID
+  id: string;
   serverId?: string;
   doctorId: string;
   doctorName: string;
   clinicName: string;
   employeeId: string;
   employeeName: string;
+  routeId?: string;
+  routeName?: string;
   date: string;
   checkInTimestamp: string;
   checkInLatitude: number;
@@ -114,16 +184,17 @@ export interface CartItem {
   product: Product;
   quantity: number;
   freeQuantity: number;
-  rate: number; // PTR
+  rate: number;
   itemTotal: number;
 }
 
 export interface POBOrder {
-  id: string; // Local Order ID
-  orderNumber: string; // e.g. POB-2026-0891
+  id: string;
+  orderNumber: string;
   serverId?: string;
   employeeId: string;
   employeeName: string;
+  routeId?: string;
   buyerType: 'CHEMIST' | 'STOCKIST';
   buyerId: string;
   buyerName: string;
@@ -147,6 +218,8 @@ export interface AttendanceRecord {
   serverId?: string;
   employeeId: string;
   employeeName: string;
+  routeId?: string;
+  routeName?: string;
   date: string;
   punchInTimestamp: string;
   punchOutTimestamp?: string;
@@ -174,7 +247,7 @@ export interface TelemetryLogPoint {
   syncStatus: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
 }
 
-export type SyncEntityType = 'ATTENDANCE' | 'VISIT' | 'POB_ORDER' | 'TELEMETRY';
+export type SyncEntityType = 'ATTENDANCE' | 'VISIT' | 'POB_ORDER' | 'TELEMETRY' | 'ROUTE_REQUEST';
 
 export interface SyncQueueItem {
   id: string;
@@ -191,6 +264,7 @@ export interface DashboardSummary {
   employee: UserProfile;
   attendancePunchedIn: boolean;
   punchInTime?: string;
+  activeRouteName: string;
   totalPlannedVisits: number;
   completedVisits: number;
   pendingVisits: number;

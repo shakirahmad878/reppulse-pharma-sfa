@@ -46,13 +46,60 @@ export class RouteService {
     return true;
   }
 
-  public static async getMonthlyTourPlan(): Promise<MonthlyTourProgramme> {
-    let mtp = await StorageService.getItem<MonthlyTourProgramme | null>(MTP_STORAGE_KEY, null);
+  public static async getMonthlyTourPlan(monthName = 'September', year = 2026): Promise<MonthlyTourProgramme> {
+    const key = `${MTP_STORAGE_KEY}_${monthName.toUpperCase()}_${year}`;
+    let mtp = await StorageService.getItem<MonthlyTourProgramme | null>(key, null);
     if (!mtp) {
-      mtp = SEPTEMBER_2026_MTP;
-      await StorageService.setItem(MTP_STORAGE_KEY, mtp);
+      if (monthName === 'September' && year === 2026) {
+        mtp = SEPTEMBER_2026_MTP;
+      } else {
+        // Generate empty template for new month
+        const daysInMonth = new Date(year, monthName === 'October' ? 10 : 9, 0).getDate();
+        const days: MTPDayPlan[] = [];
+        for (let i = 1; i <= daysInMonth; i++) {
+          const d = new Date(year, monthName === 'October' ? 9 : 8, i);
+          const isSun = d.getDay() === 0;
+          days.push({
+            dayNumber: i,
+            dayOfWeek: d.toLocaleDateString('en-US', { weekday: 'short' }),
+            dateString: `${i} ${monthName.substring(0, 3)} ${year}`,
+            isSunday: isSun,
+            routeId: isSun ? 'sunday-off' : '',
+            routeName: isSun ? 'Weekly Rest / Sunday' : '',
+            targetDoctorCalls: isSun ? 0 : 10,
+            targetChemistCalls: isSun ? 0 : 4,
+            status: isSun ? 'HOLIDAY' : 'SCHEDULED',
+            district: 'Cachar',
+          });
+        }
+        mtp = {
+          month: monthName,
+          monthName: monthName,
+          year: year,
+          employeeId: CURRENT_USER.id,
+          employeeName: CURRENT_USER.name,
+          status: 'DRAFT',
+          totalWorkingDays: daysInMonth - 4,
+          totalDoctorTargets: (daysInMonth - 4) * 10,
+          totalChemistTargets: (daysInMonth - 4) * 4,
+          days: days,
+        };
+      }
+      await StorageService.setItem(key, mtp);
     }
     return mtp;
+  }
+
+  public static async saveMTPDraft(mtp: MonthlyTourProgramme): Promise<boolean> {
+    const key = `${MTP_STORAGE_KEY}_${mtp.month.toUpperCase()}_${mtp.year}`;
+    mtp.status = 'DRAFT';
+    return await StorageService.setItem(key, mtp);
+  }
+
+  public static async submitMTPForApproval(mtp: MonthlyTourProgramme): Promise<boolean> {
+    const key = `${MTP_STORAGE_KEY}_${mtp.month.toUpperCase()}_${mtp.year}`;
+    mtp.status = 'PENDING_APPROVAL';
+    return await StorageService.setItem(key, mtp);
   }
 
   public static async getTodayMTPDay(): Promise<MTPDayPlan | null> {

@@ -9,347 +9,664 @@ import {
   TextInput,
   Modal,
   Alert,
+  FlatList,
 } from 'react-native';
 import { colors, typography, spacing, radius, shadows } from '../../constants/theme';
-import { Header } from '../../components/common/Header';
-import { Badge } from '../../components/common/Badge';
 import { RouteService } from '../../services/routeService';
-import { RoutePlan, MonthlyTourProgramme, MTPDayPlan, RouteChangeRequest } from '../../types';
+import { RoutePlan, MonthlyTourProgramme, MTPDayPlan } from '../../types';
 
 interface RoutePlanScreenProps {
   onBack: () => void;
+  onOpenDrawer?: () => void;
 }
 
-export const RoutePlanScreen: React.FC<RoutePlanScreenProps> = ({ onBack }) => {
-  const [activeTab, setActiveTab] = useState<'MTP_MONTH' | 'ALL_BEATS'>('MTP_MONTH');
+const MONTHS = ['September', 'October', 'November'];
+
+const BARAK_CITIES_LIST = [
+  'Silchar Central & Hospital Road',
+  'SMCH Ghungoor Beat',
+  'Tarapur & Station Beat',
+  'Rangirkhari & Meherpur Beat',
+  'Karimganj Main & Station Area',
+  'Badarpur Beat',
+  'Hailakandi Civil Hospital Road',
+  'Lala & Algapur Beat',
+  'Sonai & Dholai Beat',
+  'Lakhipur Beat',
+  'Patherkandi & Ramkrishna Nagar',
+];
+
+export const RoutePlanScreen: React.FC<RoutePlanScreenProps> = ({ onBack, onOpenDrawer }) => {
+  const [viewMode, setViewMode] = useState<'CALENDAR' | 'LIST'>('CALENDAR');
+  const [monthIndex, setMonthIndex] = useState(0); // 0 = Sep, 1 = Oct
+  const [currentYear, setCurrentYear] = useState(2026);
   const [mtp, setMtp] = useState<MonthlyTourProgramme | null>(null);
-  const [routes, setRoutes] = useState<RoutePlan[]>([]);
-  const [activeRoute, setActiveRoute] = useState<RoutePlan | null>(null);
-  const [requests, setRequests] = useState<RouteChangeRequest[]>([]);
-  
-  // Deviation Modal State
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedDayPlan, setSelectedDayPlan] = useState<MTPDayPlan | null>(null);
-  const [targetRouteId, setTargetRouteId] = useState<string>('');
-  const [deviationReason, setDeviationReason] = useState<string>('');
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [selectedDayNumber, setSelectedDayNumber] = useState<number | null>(null);
+
+  // Modal 1: Tour Not Created Alert
+  const [tourNotCreatedVisible, setTourNotCreatedVisible] = useState(false);
+
+  // Modal 2: Select Action (Add tour plan, Add leave, Other)
+  const [selectActionVisible, setSelectActionVisible] = useState(false);
+  const [chosenAction, setChosenAction] = useState<'TOUR_PLAN' | 'LEAVE' | 'OTHER'>('TOUR_PLAN');
+
+  // Modal 3: Select Zone
+  const [selectZoneVisible, setSelectZoneVisible] = useState(false);
+  const [zoneAssamChecked, setZoneAssamChecked] = useState(true);
+
+  // Modal 4: Select City to Add Visit
+  const [selectCityVisible, setSelectCityVisible] = useState(false);
+  const [citySearchQuery, setCitySearchQuery] = useState('');
+  const [selectedCity, setSelectedCity] = useState<string>('Karimganj Main & Station Area');
+
+  // Modal 5: Existing Plan Actions (View/Reschedule, Add new visit, Add deviation, Add Visit Firm)
+  const [existingPlanModalVisible, setExistingPlanModalVisible] = useState(false);
+  const [existingAction, setExistingAction] = useState<'RESCHEDULE' | 'NEW_VISIT' | 'DEVIATION' | 'VISIT_FIRM'>('RESCHEDULE');
+  const [existingCityName, setExistingCityName] = useState('Karimganj');
+
+  // Multi-day plan overrides stored in local state for calendar
+  const [dayPlans, setDayPlans] = useState<{ [day: number]: { city: string; type: 'TOUR' | 'LEAVE' | 'HOLIDAY' | 'APPROVED_LEAVE' | 'REJECTED' } }>({
+    1: { city: 'Silchar Central & Hospital Road', type: 'TOUR' },
+    2: { city: 'SMCH Ghungoor Beat', type: 'TOUR' },
+    3: { city: 'Tarapur & Station Beat', type: 'TOUR' },
+    4: { city: 'Rangirkhari & Meherpur Beat', type: 'TOUR' },
+    5: { city: 'Karimganj Main & Station Area', type: 'TOUR' },
+    7: { city: 'Badarpur Beat', type: 'TOUR' },
+    8: { city: 'Hailakandi Civil Hospital Road', type: 'TOUR' },
+    9: { city: 'Lala & Algapur Beat', type: 'TOUR' },
+    10: { city: 'Sonai & Dholai Beat', type: 'TOUR' },
+    11: { city: 'Lakhipur Beat', type: 'TOUR' },
+    12: { city: 'Patherkandi & Ramkrishna Nagar', type: 'TOUR' },
+    14: { city: 'Silchar Central & Hospital Road', type: 'TOUR' },
+    15: { city: 'SMCH Ghungoor Beat', type: 'TOUR' },
+    16: { city: 'Tarapur & Station Beat', type: 'TOUR' },
+    17: { city: 'Karimganj Main & Station Area', type: 'TOUR' },
+    18: { city: 'Badarpur Beat', type: 'TOUR' },
+    19: { city: 'Hailakandi Civil Hospital Road', type: 'TOUR' },
+    21: { city: 'Lala & Algapur Beat', type: 'TOUR' },
+    22: { city: 'Sonai & Dholai Beat', type: 'TOUR' },
+    23: { city: 'Silchar Central & Hospital Road', type: 'TOUR' },
+    24: { city: 'SMCH Ghungoor Beat', type: 'TOUR' },
+    25: { city: 'Tarapur & Station Beat', type: 'TOUR' },
+    26: { city: 'Karimganj Main & Station Area', type: 'TOUR' },
+    28: { city: 'Badarpur Beat', type: 'TOUR' },
+    29: { city: 'Hailakandi Civil Hospital Road', type: 'TOUR' },
+    30: { city: 'Lala & Algapur Beat', type: 'TOUR' },
+  });
+
+  // Known Holidays for Sep/Oct
+  const holidaysMap: { [month: string]: number[] } = {
+    September: [],
+    October: [2, 17, 19, 20],
+    November: [15, 24],
+  };
+
+  const currentMonthName = MONTHS[monthIndex];
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadMtp();
+  }, [monthIndex]);
 
-  const loadData = async () => {
-    const mtpData = await RouteService.getMonthlyTourPlan();
-    setMtp(mtpData);
-    const routeList = await RouteService.getRoutes();
-    setRoutes(routeList);
-    const active = await RouteService.getActiveRoute();
-    setActiveRoute(active);
-    const reqList = await RouteService.getRouteChangeRequests();
-    setRequests(reqList);
+  const loadMtp = async () => {
+    const data = await RouteService.getMonthlyTourPlan(currentMonthName, currentYear);
+    setMtp(data);
   };
 
-  const handleOpenDeviation = (day: MTPDayPlan) => {
-    if (day.isSunday) {
-      Alert.alert('Sunday Off', 'Sunday is scheduled as weekly rest & offline sync day.');
-      return;
+  const handlePrevMonth = () => {
+    if (monthIndex > 0) {
+      setMonthIndex(monthIndex - 1);
     }
-    setSelectedDayPlan(day);
-    setTargetRouteId(routes[0]?.id || 'route-cachar-01');
-    setDeviationReason('');
-    setModalVisible(true);
   };
 
-  const handleSubmitDeviation = async () => {
-    if (!selectedDayPlan) return;
-    if (!deviationReason.trim()) {
-      Alert.alert('Reason Required', 'Please provide a clear justification for deviating from the approved MTP.');
-      return;
+  const handleNextMonth = () => {
+    if (monthIndex < MONTHS.length - 1) {
+      const nextIdx = monthIndex + 1;
+      setMonthIndex(nextIdx);
+      if (MONTHS[nextIdx] === 'October') {
+        setTourNotCreatedVisible(true);
+      }
     }
-
-    const req = await RouteService.requestMTPDeviation(
-      selectedDayPlan.dayNumber,
-      targetRouteId,
-      deviationReason
-    );
-    setModalVisible(false);
-    await loadData();
-    Alert.alert(
-      'MTP Deviation Submitted',
-      'Request for ' + req.dateString + ' -> ' + req.requestedRouteName + ' submitted to RBM. Status: PENDING APPROVAL.'
-    );
   };
 
-  const handleAdminApproval = async (requestId: string, approve: boolean) => {
-    await RouteService.adminReviewRequest(requestId, approve);
-    await loadData();
-    Alert.alert(
-      approve ? 'MTP Deviation Approved' : 'Deviation Rejected',
-      approve ? 'Updated beat activated for the representative.' : 'Request has been rejected.'
-    );
+  const handleDayPress = (dayNum: number) => {
+    setSelectedDayNumber(dayNum);
+    const existing = dayPlans[dayNum];
+    if (existing && existing.city) {
+      setExistingCityName(existing.city);
+      setExistingAction('RESCHEDULE');
+      setExistingPlanModalVisible(true);
+    } else {
+      setChosenAction('TOUR_PLAN');
+      setSelectActionVisible(true);
+    }
   };
 
-  const todayDateNum = new Date().getDate();
+  // Step 1: Confirm action (Add tour plan -> open zone)
+  const handleConfirmAction = () => {
+    setSelectActionVisible(false);
+    if (chosenAction === 'TOUR_PLAN') {
+      setSelectZoneVisible(true);
+    } else if (chosenAction === 'LEAVE') {
+      if (selectedDayNumber) {
+        setDayPlans({
+          ...dayPlans,
+          [selectedDayNumber]: { city: 'Casual Leave (Pending)', type: 'LEAVE' },
+        });
+        Alert.alert('Leave Marked', `Pending leave recorded for ${selectedDayNumber} ${currentMonthName}.`);
+      }
+    } else {
+      Alert.alert('Notice', 'Other duty / conference recorded.');
+    }
+  };
+
+  // Step 2: Confirm zone -> open city selection
+  const handleConfirmZone = () => {
+    setSelectZoneVisible(false);
+    setCitySearchQuery('');
+    setSelectCityVisible(true);
+  };
+
+  // Step 3: Confirm city -> assign to date
+  const handleConfirmCity = () => {
+    setSelectCityVisible(false);
+    if (selectedDayNumber) {
+      setDayPlans({
+        ...dayPlans,
+        [selectedDayNumber]: { city: selectedCity, type: 'TOUR' },
+      });
+      Alert.alert(
+        'Tour Plan Updated',
+        `Visit to ${selectedCity} scheduled for ${selectedDayNumber} ${currentMonthName} 2026.`
+      );
+    }
+  };
+
+  // Step 4: Handle existing plan action
+  const handleConfirmExistingAction = () => {
+    setExistingPlanModalVisible(false);
+    if (!selectedDayNumber) return;
+
+    if (existingAction === 'RESCHEDULE') {
+      setSelectCityVisible(true);
+    } else if (existingAction === 'DEVIATION') {
+      Alert.prompt
+        ? Alert.prompt(
+            'Add Route Deviation',
+            `Enter justification for deviating from ${existingCityName}:`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Submit to RBM',
+                onPress: (reason) => {
+                  Alert.alert(
+                    'Deviation Requested',
+                    `Route deviation for ${selectedDayNumber} ${currentMonthName} sent to RBM Rajesh Sharma for approval.`
+                  );
+                },
+              },
+            ]
+          )
+        : Alert.alert(
+            'Deviation Requested',
+            `Route deviation for ${selectedDayNumber} ${currentMonthName} submitted to RBM Rajesh Sharma.`
+          );
+    } else if (existingAction === 'VISIT_FIRM') {
+      Alert.alert('Add Visit Firm', `Added wholesale firm call in ${existingCityName} to your itinerary.`);
+    } else {
+      Alert.alert('Add New Visit', `Doctor visit added to ${existingCityName}.`);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (mtp) {
+      await RouteService.saveMTPDraft(mtp);
+      Alert.alert('Draft Saved ✅', `Tour plan draft for ${currentMonthName} 2026 saved successfully.`);
+    }
+  };
+
+  const handleSubmitForApproval = async () => {
+    if (mtp) {
+      await RouteService.submitMTPForApproval(mtp);
+      Alert.alert(
+        'Tour Plan Submitted ✅',
+        `Tour plan for ${currentMonthName} 2026 submitted to RBM (Rajesh Sharma) & ABM (G Solanki) for approval.`
+      );
+    }
+  };
+
+  // Calendar Grid Calculations
+  // Sep 2026 starts on Tue (idx 2), Oct 2026 starts on Thu (idx 4)
+  const getFirstDayOffset = (mName: string) => {
+    if (mName === 'September') return 2; // Tuesday
+    if (mName === 'October') return 4; // Thursday
+    return 0; // November: Sunday
+  };
+
+  const getDaysInMonth = (mName: string) => {
+    if (mName === 'September') return 30;
+    if (mName === 'October') return 31;
+    return 30;
+  };
+
+  const offset = getFirstDayOffset(currentMonthName);
+  const totalDays = getDaysInMonth(currentMonthName);
+  const calendarCells = [];
+  for (let i = 0; i < offset; i++) {
+    calendarCells.push(null);
+  }
+  for (let d = 1; d <= totalDays; d++) {
+    calendarCells.push(d);
+  }
+  while (calendarCells.length % 7 !== 0) {
+    calendarCells.push(null);
+  }
+
+  const currentHolidays = holidaysMap[currentMonthName] || [];
+
+  const filteredCities = BARAK_CITIES_LIST.filter(c =>
+    c.toLowerCase().includes(citySearchQuery.toLowerCase())
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header
-        title="Monthly Tour Plan (MTP)"
-        subtitle="Barak Valley Division (Assam) • Sep 2026"
-        showBack
-        onBack={onBack}
-      />
-
-      {/* Mode Switcher: 30-Day MTP Calendar | All Barak Beats */}
-      <View style={styles.tabSwitcherRow}>
+      {/* Top Bright Green Header */}
+      <View style={styles.topGreenHeader}>
         <TouchableOpacity
-          style={[styles.tabSwitchBtn, activeTab === 'MTP_MONTH' && styles.tabSwitchBtnActive]}
-          onPress={() => setActiveTab('MTP_MONTH')}
+          style={styles.headerIconBtn}
+          onPress={onOpenDrawer || onBack}
+          activeOpacity={0.7}
         >
-          <Text style={[styles.tabSwitchText, activeTab === 'MTP_MONTH' && styles.tabSwitchTextActive]}>
-            📅 30-Day MTP Schedule
-          </Text>
+          <Text style={styles.menuIconText}>☰</Text>
         </TouchableOpacity>
 
+        <Text style={styles.headerTitleText}>TOUR PLAN</Text>
+
         <TouchableOpacity
-          style={[styles.tabSwitchBtn, activeTab === 'ALL_BEATS' && styles.tabSwitchBtnActive]}
-          onPress={() => setActiveTab('ALL_BEATS')}
+          style={styles.headerListBtn}
+          onPress={() => setViewMode(viewMode === 'CALENDAR' ? 'LIST' : 'CALENDAR')}
+          activeOpacity={0.7}
         >
-          <Text style={[styles.tabSwitchText, activeTab === 'ALL_BEATS' && styles.tabSwitchTextActive]}>
-            🗺️ All Barak Beats ({routes.length})
-          </Text>
+          <Text style={styles.listBtnText}>{viewMode === 'CALENDAR' ? 'List' : 'Cal'}</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        {activeTab === 'MTP_MONTH' ? (
-          <>
-            {/* MTP Month Approval Header Banner */}
-            <View style={styles.mtpHeroBanner}>
-              <View style={styles.bannerTopRow}>
-                <Text style={styles.bannerMonthTitle}>September 2026 Advance Tour Plan</Text>
-                <Badge label="APPROVED BY RBM" variant="success" />
+      {/* Legend Strip */}
+      <View style={styles.legendStrip}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#22C55E' }]} />
+          <Text style={styles.legendText}>tour plan.</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#EAB308' }]} />
+          <Text style={styles.legendText}>Pending Leave</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
+          <Text style={styles.legendText}>Holidays</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#9333EA' }]} />
+          <Text style={styles.legendText}>Approved Leave</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+          <Text style={styles.legendText}>Cancelled/Rejected...</Text>
+        </View>
+      </View>
+
+      {/* Month Navigation Strip (Muted Green) */}
+      <View style={styles.monthNavStrip}>
+        <TouchableOpacity style={styles.monthNavBtn} onPress={handlePrevMonth}>
+          <Text style={styles.monthNavArrow}>{'< Prev'}</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.monthNavTitle}>
+          {currentMonthName} {currentYear}
+        </Text>
+
+        <TouchableOpacity style={styles.monthNavBtn} onPress={handleNextMonth}>
+          <Text style={styles.monthNavArrow}>{'Next >'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {viewMode === 'CALENDAR' ? (
+        <ScrollView style={styles.calendarScrollView}>
+          {/* Days of Week Header */}
+          <View style={styles.daysHeaderRow}>
+            {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
+              <View key={day} style={styles.dayHeaderCell}>
+                <Text style={styles.dayHeaderText}>{day}</Text>
               </View>
-              <Text style={styles.bannerSub}>
-                Authorized by: {mtp?.approvedBy || 'Rajesh Sharma (RBM)'}
-              </Text>
+            ))}
+          </View>
 
-              {/* Monthly KPI Overview */}
-              <View style={styles.kpiRow}>
-                <View style={styles.kpiCol}>
-                  <Text style={styles.kpiVal}>{mtp?.totalWorkingDays || 26}</Text>
-                  <Text style={styles.kpiLbl}>Working Days</Text>
-                </View>
-                <View style={styles.kpiCol}>
-                  <Text style={styles.kpiVal}>{mtp?.totalPlannedDoctorCalls || 240}</Text>
-                  <Text style={styles.kpiLbl}>Doctor Calls</Text>
-                </View>
-                <View style={styles.kpiCol}>
-                  <Text style={styles.kpiVal}>{mtp?.totalPlannedChemistCalls || 96}</Text>
-                  <Text style={styles.kpiLbl}>Chemist Calls</Text>
-                </View>
-                <View style={styles.kpiCol}>
-                  <Text style={styles.kpiVal}>4 Days</Text>
-                  <Text style={styles.kpiLbl}>Joint Working</Text>
-                </View>
-              </View>
-            </View>
+          {/* Calendar Grid */}
+          <View style={styles.calendarGrid}>
+            {calendarCells.map((dayNum, idx) => {
+              if (dayNum === null) {
+                return <View key={'empty-' + idx} style={styles.calendarCellEmpty} />;
+              }
 
-            {/* Admin Toggle Row */}
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>30-Day Daily Tour Schedule</Text>
-              <TouchableOpacity
-                onPress={() => setIsAdminMode(!isAdminMode)}
-                style={styles.adminToggleBtn}
-              >
-                <Text style={styles.adminToggleText}>
-                  {isAdminMode ? '🛡️ Admin Review Mode (ON)' : '👤 Rep Mode'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+              const isHoliday = currentHolidays.includes(dayNum);
+              const plan = dayPlans[dayNum];
+              const isSunday = idx % 7 === 0;
 
-            {/* Requests Section if any */}
-            {requests.length > 0 && (
-              <View style={styles.requestsSection}>
-                <Text style={styles.subSectionTitle}>Active Deviation Requests ({requests.length})</Text>
-                {requests.map(req => (
-                  <View key={req.id} style={styles.reqCard}>
-                    <View style={styles.reqHeader}>
-                      <Text style={styles.reqDate}>{req.dateString || 'Day Target'}</Text>
-                      <Badge
-                        label={req.status.replace('_', ' ')}
-                        variant={req.status === 'APPROVED' ? 'success' : req.status === 'REJECTED' ? 'danger' : 'warning'}
-                      />
-                    </View>
-                    <Text style={styles.reqText}>Target: <Text style={styles.boldText}>{req.requestedRouteName}</Text></Text>
-                    <Text style={styles.reqReason}>Reason: "{req.reason}"</Text>
-
-                    {isAdminMode && req.status === 'PENDING_APPROVAL' && (
-                      <View style={styles.adminActionRow}>
-                        <TouchableOpacity
-                          style={[styles.adminBtn, styles.approveBtn]}
-                          onPress={() => handleAdminApproval(req.id, true)}
-                        >
-                          <Text style={styles.adminBtnText}>✓ Approve Deviation</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.adminBtn, styles.rejectBtn]}
-                          onPress={() => handleAdminApproval(req.id, false)}
-                        >
-                          <Text style={styles.adminBtnText}>✕ Reject</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Daily Timeline Cards */}
-            {mtp?.days.map(day => {
-              const isToday = day.dayNumber === todayDateNum;
               return (
-                <View
-                  key={day.dayNumber}
-                  style={[
-                    styles.dayCard,
-                    isToday && styles.dayCardToday,
-                    day.isSunday && styles.dayCardSunday,
-                  ]}
-                >
-                  <View style={styles.dayTopRow}>
-                    <View style={styles.dateCircle}>
-                      <Text style={[styles.dayNum, isToday && styles.dayNumToday]}>{day.dayNumber}</Text>
-                      <Text style={styles.dayWk}>{day.dayOfWeek}</Text>
-                    </View>
-
-                    <View style={{ flex: 1, marginLeft: spacing.md }}>
-                      <View style={styles.routeHeaderRow}>
-                        <Text style={[styles.dayRouteName, isToday && styles.dayRouteNameToday]} numberOfLines={1}>
-                          {day.routeName}
-                        </Text>
-                        {isToday && <Badge label="TODAY" variant="primary" />}
-                        {day.isSunday && <Badge label="OFF" variant="muted" />}
-                      </View>
-
-                      {!day.isSunday && (
-                        <View style={styles.dayMetaRow}>
-                          <Text style={styles.dayMetaText}>🎯 {day.targetDoctorCalls} Dr Calls • {day.targetChemistCalls} Chemist</Text>
-                          {day.isJointWorking && (
-                            <View style={styles.jointTag}>
-                              <Text style={styles.jointTagText}>👔 Joint: {day.accompaniedName}</Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                    </View>
-                  </View>
-
-                  {!day.isSunday && (
-                    <View style={styles.dayFooterRow}>
-                      <Text style={styles.districtTag}>📍 {day.district} District</Text>
-                      <TouchableOpacity
-                        style={styles.deviateBtn}
-                        onPress={() => handleOpenDeviation(day)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.deviateBtnText}>Change Beat ›</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </>
-        ) : (
-          <>
-            {/* All Barak Division Beats Directory */}
-            <Text style={styles.sectionTitle}>Barak Division Standard Master Beats</Text>
-            <Text style={styles.sectionSubtitle}>Pre-configured territory circuits for Cachar, Karimganj, and Hailakandi</Text>
-
-            {routes.map(route => {
-              const isActive = route.id === activeRoute?.id;
-              return (
-                <View
-                  key={route.id}
-                  style={[styles.masterBeatCard, isActive && styles.masterBeatCardActive]}
-                >
-                  <View style={styles.beatHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.beatCode}>{route.code} • {route.district} District</Text>
-                      <Text style={styles.beatName}>{route.name}</Text>
-                    </View>
-                    <Badge label={isActive ? 'TODAYS BEAT' : 'STANDARD'} variant={isActive ? 'primary' : 'muted'} />
-                  </View>
-                  <Text style={styles.beatDesc}>{route.description}</Text>
-
-                  <View style={styles.areasTagWrap}>
-                    {route.areas.map((area, idx) => (
-                      <View key={idx} style={styles.areaChip}>
-                        <Text style={styles.areaChipText}>📍 {area}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  <View style={styles.beatFooter}>
-                    <Text style={styles.beatStats}>
-                      👨‍⚕️ {route.totalDoctors} Doctors • 🏥 {route.totalHospitals} Hospitals • 💊 {route.totalChemists} Chemists
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-          </>
-        )}
-      </ScrollView>
-
-      {/* MTP Deviation Request Modal */}
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Request MTP Route Deviation</Text>
-            <Text style={styles.modalSubtitle}>
-              For: {selectedDayPlan?.dateString} ({selectedDayPlan?.routeName})
-            </Text>
-
-            <Text style={styles.inputLabel}>Select Proposed Replacement Beat:</Text>
-            <View style={styles.routePickerWrap}>
-              {routes.map(r => (
                 <TouchableOpacity
-                  key={r.id}
-                  style={[styles.routePickerItem, targetRouteId === r.id && styles.routePickerItemActive]}
-                  onPress={() => setTargetRouteId(r.id)}
+                  key={'day-' + dayNum}
+                  style={styles.calendarCell}
+                  activeOpacity={0.7}
+                  onPress={() => handleDayPress(dayNum)}
                 >
-                  <Text style={[styles.routePickerText, targetRouteId === r.id && styles.routePickerTextActive]}>
-                    {r.name}
-                  </Text>
+                  <Text style={styles.cellDayNumber}>{dayNum}</Text>
+
+                  {/* Status Indicator Dot */}
+                  {isHoliday ? (
+                    <View style={[styles.cellDot, { backgroundColor: '#3B82F6' }]} />
+                  ) : plan ? (
+                    <View
+                      style={[
+                        styles.cellDot,
+                        {
+                          backgroundColor:
+                            plan.type === 'LEAVE'
+                              ? '#EAB308'
+                              : plan.type === 'APPROVED_LEAVE'
+                              ? '#9333EA'
+                              : '#22C55E',
+                        },
+                      ]}
+                    />
+                  ) : null}
                 </TouchableOpacity>
-              ))}
-            </View>
+              );
+            })}
+          </View>
 
-            <Text style={styles.inputLabel}>Reason for Month Plan Deviation (Mandatory):</Text>
-            <TextInput
-              style={styles.reasonInput}
-              placeholder="e.g. Urgent key doctor call at SMCH or priority stockist order followup."
-              placeholderTextColor="#94A3B8"
-              multiline
-              numberOfLines={3}
-              value={deviationReason}
-              onChangeText={setDeviationReason}
-            />
+          {/* Bottom Action Buttons */}
+          <View style={styles.bottomButtonsRow}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleSubmitForApproval}>
+              <Text style={styles.actionBtnText}>Submit for approval</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleSaveDraft}>
+              <Text style={styles.actionBtnText}>Save as draft</Text>
+            </TouchableOpacity>
+          </View>
 
-            <View style={styles.modalBtnRow}>
+          {/* Bottom Warning Notice */}
+          <Text style={styles.bottomWarningNotice}>
+            * DO NOT press back button or navigate away from this page without saving your work. Press Save as Draft button for saving your changes.
+          </Text>
+        </ScrollView>
+      ) : (
+        /* List Mode View */
+        <FlatList
+          data={mtp?.days || []}
+          keyExtractor={item => 'list-day-' + item.dayNumber}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.listCard}
+              onPress={() => handleDayPress(item.dayNumber)}
+            >
+              <View style={styles.listDayBadge}>
+                <Text style={styles.listDayNum}>{item.dayNumber}</Text>
+                <Text style={styles.listDayName}>{item.dayOfWeek || 'Mon'}</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Text style={styles.listRouteTitle}>
+                  {dayPlans[item.dayNumber]?.city || item.routeName || 'No Beat Assigned'}
+                </Text>
+                <Text style={styles.listCallTarget}>
+                  🎯 Target: {item.targetDoctorCalls} Doctors • {item.targetChemistCalls} Chemists
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+
+      {/* MODAL 1: Tour Not Created Alert Dialog */}
+      <Modal visible={tourNotCreatedVisible} transparent animationType="fade">
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>Tour not created</Text>
+            <Text style={styles.alertMessage}>
+              Tour plan for October 2026month is not submitted yet. Press OK to create, modify and submit tour plan for October 2026
+            </Text>
+            <View style={styles.alertBtnRow}>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalCancelBtn]}
-                onPress={() => setModalVisible(false)}
+                style={styles.alertCancelBtn}
+                onPress={() => setTourNotCreatedVisible(false)}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.alertCancelText}>CANCEL</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalSubmitBtn]}
-                onPress={handleSubmitDeviation}
+                style={styles.alertOkBtn}
+                onPress={() => setTourNotCreatedVisible(false)}
               >
-                <Text style={styles.modalSubmitText}>Submit to RBM</Text>
+                <Text style={styles.alertOkText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL 2: Select Action (Add tour plan, Add leave, Other) */}
+      <Modal visible={selectActionVisible} transparent animationType="fade">
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <View style={styles.dialogHeader}>
+              <Text style={styles.dialogHeaderText}>Select action</Text>
+            </View>
+
+            <View style={styles.dialogBody}>
+              <TouchableOpacity
+                style={styles.radioRow}
+                onPress={() => setChosenAction('TOUR_PLAN')}
+              >
+                <View style={[styles.radioOuter, chosenAction === 'TOUR_PLAN' && styles.radioOuterActive]}>
+                  {chosenAction === 'TOUR_PLAN' && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioLabel}>Add tour plan</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.radioRow}
+                onPress={() => setChosenAction('LEAVE')}
+              >
+                <View style={[styles.radioOuter, chosenAction === 'LEAVE' && styles.radioOuterActive]}>
+                  {chosenAction === 'LEAVE' && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioLabel}>Add leave</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.radioRow}
+                onPress={() => setChosenAction('OTHER')}
+              >
+                <View style={[styles.radioOuter, chosenAction === 'OTHER' && styles.radioOuterActive]}>
+                  {chosenAction === 'OTHER' && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioLabel}>Other</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.dialogFooterRow}>
+              <TouchableOpacity
+                style={styles.dialogCancelBtn}
+                onPress={() => setSelectActionVisible(false)}
+              >
+                <Text style={styles.dialogCancelText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dialogOkBtn}
+                onPress={handleConfirmAction}
+              >
+                <Text style={styles.dialogOkText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL 3: Select Zone to Add Visit */}
+      <Modal visible={selectZoneVisible} transparent animationType="fade">
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <View style={styles.dialogHeader}>
+              <Text style={styles.dialogHeaderText}>Select zone to add visit</Text>
+            </View>
+
+            <View style={styles.dialogBody}>
+              <TouchableOpacity
+                style={styles.checkboxRow}
+                onPress={() => setZoneAssamChecked(!zoneAssamChecked)}
+              >
+                <Text style={styles.checkboxLabel}>Assam</Text>
+                <View style={[styles.checkboxBox, zoneAssamChecked && styles.checkboxBoxChecked]}>
+                  {zoneAssamChecked && <Text style={styles.checkmarkIcon}>✓</Text>}
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.dialogFooterRow}>
+              <TouchableOpacity
+                style={styles.dialogCancelBtn}
+                onPress={() => setSelectZoneVisible(false)}
+              >
+                <Text style={styles.dialogCancelText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dialogOkBtn}
+                onPress={handleConfirmZone}
+              >
+                <Text style={styles.dialogOkText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL 4: Select City to Add Visit */}
+      <Modal visible={selectCityVisible} transparent animationType="fade">
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <View style={styles.dialogHeader}>
+              <Text style={styles.dialogHeaderText}>Select city to add visit</Text>
+            </View>
+
+            <View style={styles.searchBarWrapper}>
+              <Text style={styles.searchIconText}>🔍</Text>
+              <TextInput
+                style={styles.citySearchInput}
+                placeholder="Search city / beat..."
+                placeholderTextColor="#94A3B8"
+                value={citySearchQuery}
+                onChangeText={setCitySearchQuery}
+              />
+            </View>
+
+            <ScrollView style={styles.cityScrollView}>
+              {filteredCities.map(city => {
+                const isSelected = selectedCity === city;
+                return (
+                  <TouchableOpacity
+                    key={city}
+                    style={styles.cityListItem}
+                    onPress={() => setSelectedCity(city)}
+                  >
+                    <Text style={styles.cityNameText}>{city}</Text>
+                    <View style={[styles.checkboxBox, isSelected && styles.checkboxBoxChecked]}>
+                      {isSelected && <Text style={styles.checkmarkIcon}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.dialogFooterRow}>
+              <TouchableOpacity
+                style={styles.dialogCancelBtn}
+                onPress={() => setSelectCityVisible(false)}
+              >
+                <Text style={styles.dialogCancelText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dialogOkBtn}
+                onPress={handleConfirmCity}
+              >
+                <Text style={styles.dialogOkText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL 5: Existing Tour City Options */}
+      <Modal visible={existingPlanModalVisible} transparent animationType="fade">
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogCard}>
+            <View style={styles.dialogHeader}>
+              <Text style={styles.dialogHeaderText}>
+                Your city for tourplan is : {existingCityName.split('&')[0].trim()}
+              </Text>
+            </View>
+
+            <View style={styles.dialogBody}>
+              <TouchableOpacity
+                style={styles.radioRow}
+                onPress={() => setExistingAction('RESCHEDULE')}
+              >
+                <View style={[styles.radioOuter, existingAction === 'RESCHEDULE' && styles.radioOuterActive]}>
+                  {existingAction === 'RESCHEDULE' && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioLabel}>View/Reschedule visit</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.radioRow}
+                onPress={() => setExistingAction('NEW_VISIT')}
+              >
+                <View style={[styles.radioOuter, existingAction === 'NEW_VISIT' && styles.radioOuterActive]}>
+                  {existingAction === 'NEW_VISIT' && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioLabel}>Add new visit</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.radioRow}
+                onPress={() => setExistingAction('DEVIATION')}
+              >
+                <View style={[styles.radioOuter, existingAction === 'DEVIATION' && styles.radioOuterActive]}>
+                  {existingAction === 'DEVIATION' && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioLabel}>Add deviation</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.radioRow}
+                onPress={() => setExistingAction('VISIT_FIRM')}
+              >
+                <View style={[styles.radioOuter, existingAction === 'VISIT_FIRM' && styles.radioOuterActive]}>
+                  {existingAction === 'VISIT_FIRM' && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioLabel}>Add Visit Firm</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.dialogFooterRow}>
+              <TouchableOpacity
+                style={styles.dialogCancelBtn}
+                onPress={() => setExistingPlanModalVisible(false)}
+              >
+                <Text style={styles.dialogCancelText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dialogOkBtn}
+                onPress={handleConfirmExistingAction}
+              >
+                <Text style={styles.dialogOkText}>OK</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -360,155 +677,427 @@ export const RoutePlanScreen: React.FC<RoutePlanScreenProps> = ({ onBack }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  tabSwitcherRow: {
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  topGreenHeader: {
+    backgroundColor: '#34C759',
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  headerIconBtn: {
+    padding: spacing.xs,
+  },
+  menuIconText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  headerTitleText: {
+    color: '#FFFFFF',
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 0.5,
+  },
+  headerListBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+  },
+  listBtnText: {
+    color: '#FFFFFF',
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  legendStrip: {
     backgroundColor: '#FFFFFF',
-    padding: spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    gap: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
-  tabSwitchBtn: {
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 4,
+  },
+  legendText: {
+    color: '#475569',
+    fontSize: 10,
+    fontWeight: typography.fontWeight.medium,
+  },
+  monthNavStrip: {
+    backgroundColor: '#2E7D32',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 8,
+  },
+  monthNavBtn: {
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+  },
+  monthNavArrow: {
+    color: '#C8E6C9',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+  monthNavTitle: {
+    color: '#FFFFFF',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+  },
+  calendarScrollView: {
+    flex: 1,
+  },
+  daysHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: '#E2E8F0',
+    borderBottomWidth: 1,
+    borderBottomColor: '#CBD5E1',
+  },
+  dayHeaderCell: {
     flex: 1,
     paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: radius.md,
   },
-  tabSwitchBtnActive: {
-    backgroundColor: '#EFF6FF',
-    borderBottomWidth: 2,
-    borderBottomColor: '#2563EB',
+  dayHeaderText: {
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: typography.fontWeight.bold,
   },
-  tabSwitchText: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.semibold, color: '#64748B' },
-  tabSwitchTextActive: { color: '#1D4ED8', fontWeight: typography.fontWeight.bold },
-  scroll: { flex: 1 },
-  scrollContent: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  mtpHeroBanner: {
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     backgroundColor: '#FFFFFF',
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-    ...shadows.card,
   },
-  bannerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  bannerMonthTitle: { fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.black, color: '#0F172A' },
-  bannerSub: { fontSize: typography.fontSize.xs, color: '#2563EB', marginTop: 2, fontWeight: typography.fontWeight.semibold },
-  kpiRow: {
-    flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
-    borderRadius: radius.md,
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    justifyContent: 'space-around',
+  calendarCellEmpty: {
+    width: '14.285%',
+    height: 54,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
   },
-  kpiCol: { alignItems: 'center' },
-  kpiVal: { fontSize: typography.fontSize.md, fontWeight: typography.fontWeight.bold, color: '#1D4ED8' },
-  kpiLbl: { fontSize: typography.fontSize.xxs, color: '#64748B', marginTop: 2 },
-  sectionHeaderRow: {
+  calendarCell: {
+    width: '14.285%',
+    height: 54,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 6,
+    position: 'relative',
+    backgroundColor: '#FFFFFF',
+  },
+  cellDayNumber: {
+    color: '#0F172A',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+  },
+  cellDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  bottomButtonsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.xl,
     marginBottom: spacing.md,
   },
-  sectionTitle: { fontSize: typography.fontSize.md, fontWeight: typography.fontWeight.bold, color: '#0F172A' },
-  sectionSubtitle: { fontSize: typography.fontSize.xs, color: '#64748B', marginBottom: spacing.md },
-  adminToggleBtn: { backgroundColor: '#DBEAFE', paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full },
-  adminToggleText: { fontSize: typography.fontSize.xs, color: '#1E40AF', fontWeight: typography.fontWeight.bold },
-  requestsSection: { marginBottom: spacing.lg },
-  subSectionTitle: { fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold, color: '#1E3A8A', marginBottom: spacing.xs },
-  reqCard: { backgroundColor: '#FFFFFF', borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: '#E2E8F0' },
-  reqHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  reqDate: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold, color: '#0F172A' },
-  reqText: { fontSize: typography.fontSize.xs, color: '#475569', marginTop: 4 },
-  boldText: { fontWeight: typography.fontWeight.bold, color: '#1D4ED8' },
-  reqReason: { fontSize: typography.fontSize.xs, color: '#64748B', fontStyle: 'italic', marginTop: 2 },
-  adminActionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  adminBtn: { flex: 1, paddingVertical: 6, borderRadius: radius.sm, alignItems: 'center' },
-  approveBtn: { backgroundColor: '#10B981' },
-  rejectBtn: { backgroundColor: '#EF4444' },
-  adminBtnText: { color: '#FFFFFF', fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold },
-  dayCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.lg,
+  actionBtn: {
+    flex: 1,
+    backgroundColor: '#94A3B8',
+    paddingVertical: spacing.md,
+    borderRadius: radius.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnText: {
+    color: '#0F172A',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+  bottomWarningNotice: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+    color: '#64748B',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  listContent: {
     padding: spacing.md,
+    paddingBottom: spacing.xxxl,
+  },
+  listCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: spacing.md,
+    borderRadius: radius.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    ...shadows.subtle,
   },
-  dayCardToday: {
-    borderColor: '#3B82F6',
-    borderWidth: 2,
-    backgroundColor: '#F8FAFC',
-  },
-  dayCardSunday: {
-    backgroundColor: '#F1F5F9',
-    opacity: 0.8,
-  },
-  dayTopRow: { flexDirection: 'row', alignItems: 'center' },
-  dateCircle: {
+  listDayBadge: {
     width: 44,
     height: 44,
-    borderRadius: radius.md,
-    backgroundColor: '#EFF6FF',
+    borderRadius: radius.sm,
+    backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
   },
-  dayNum: { fontSize: typography.fontSize.md, fontWeight: typography.fontWeight.black, color: '#1D4ED8' },
-  dayNumToday: { color: '#2563EB' },
-  dayWk: { fontSize: typography.fontSize.xxs, color: '#64748B', fontWeight: typography.fontWeight.bold },
-  routeHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dayRouteName: { fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold, color: '#0F172A', flex: 1 },
-  dayRouteNameToday: { color: '#1D4ED8' },
-  dayMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 4 },
-  dayMetaText: { fontSize: typography.fontSize.xxs, color: '#64748B' },
-  jointTag: { backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.xs },
-  jointTagText: { fontSize: typography.fontSize.xxs, color: '#B45309', fontWeight: typography.fontWeight.bold },
-  dayFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: '#F8FAFC' },
-  districtTag: { fontSize: typography.fontSize.xxs, color: '#64748B' },
-  deviateBtn: { paddingVertical: 2 },
-  deviateBtnText: { fontSize: typography.fontSize.xs, color: '#2563EB', fontWeight: typography.fontWeight.bold },
-  masterBeatCard: {
+  listDayNum: {
+    color: '#15803D',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+  },
+  listDayName: {
+    color: '#166534',
+    fontSize: 10,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  listRouteTitle: {
+    color: '#0F172A',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+  listCallTarget: {
+    color: '#64748B',
+    fontSize: typography.fontSize.xs,
+    marginTop: 2,
+  },
+
+  // Alert Modal (Tour Not Created)
+  alertOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  alertBox: {
+    width: '100%',
+    maxWidth: 320,
     backgroundColor: '#FFFFFF',
     borderRadius: radius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    ...shadows.subtle,
+    ...shadows.card,
   },
-  masterBeatCardActive: {
-    borderColor: '#3B82F6',
-    borderWidth: 1.5,
+  alertTitle: {
+    color: '#0F172A',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
-  beatHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  beatCode: { fontSize: typography.fontSize.xxs, fontWeight: typography.fontWeight.bold, color: '#2563EB' },
-  beatName: { fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.bold, color: '#0F172A', marginTop: 2 },
-  beatDesc: { fontSize: typography.fontSize.xs, color: '#64748B', marginTop: spacing.xs, lineHeight: 18 },
-  areasTagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
-  areaChip: { backgroundColor: '#F1F5F9', borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 3 },
-  areaChipText: { fontSize: typography.fontSize.xxs, color: '#475569' },
-  beatFooter: { marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  beatStats: { fontSize: typography.fontSize.xs, color: '#1E3A8A', fontWeight: typography.fontWeight.semibold },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.5)', justifyContent: 'center', padding: spacing.lg },
-  modalCard: { backgroundColor: '#FFFFFF', borderRadius: radius.xl, padding: spacing.xl, ...shadows.floating },
-  modalTitle: { fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: '#0F172A' },
-  modalSubtitle: { fontSize: typography.fontSize.xs, color: '#2563EB', fontWeight: typography.fontWeight.semibold, marginBottom: spacing.md },
-  inputLabel: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold, color: '#475569', marginBottom: spacing.xs },
-  routePickerWrap: { marginBottom: spacing.md, maxHeight: 140 },
-  routePickerItem: { backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 4, borderWidth: 1, borderColor: '#E2E8F0' },
-  routePickerItemActive: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
-  routePickerText: { fontSize: typography.fontSize.xs, color: '#334155' },
-  routePickerTextActive: { color: '#1D4ED8', fontWeight: typography.fontWeight.bold },
-  reasonInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, padding: spacing.md, fontSize: typography.fontSize.sm, color: '#0F172A', height: 75, textAlignVertical: 'top', marginBottom: spacing.lg },
-  modalBtnRow: { flexDirection: 'row', gap: spacing.md },
-  modalBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: radius.md, alignItems: 'center' },
-  modalCancelBtn: { backgroundColor: '#F1F5F9' },
-  modalCancelText: { color: '#475569', fontWeight: typography.fontWeight.semibold },
-  modalSubmitBtn: { backgroundColor: '#3B82F6' },
-  modalSubmitText: { color: '#FFFFFF', fontWeight: typography.fontWeight.bold },
+  alertMessage: {
+    color: '#334155',
+    fontSize: typography.fontSize.sm,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  alertBtnRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: spacing.sm,
+  },
+  alertCancelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  alertCancelText: {
+    color: '#3B82F6',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+  alertOkBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderLeftWidth: 1,
+    borderLeftColor: '#E2E8F0',
+  },
+  alertOkText: {
+    color: '#3B82F6',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+
+  // Dialog Styles (Green Header)
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  dialogCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    ...shadows.card,
+  },
+  dialogHeader: {
+    backgroundColor: '#48BB78',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  dialogHeaderText: {
+    color: '#FFFFFF',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+  },
+  dialogBody: {
+    padding: spacing.lg,
+  },
+  radioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#94A3B8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  radioOuterActive: {
+    borderColor: '#F59E0B',
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#F59E0B',
+  },
+  radioLabel: {
+    color: '#0F172A',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  checkboxLabel: {
+    color: '#0F172A',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+  },
+  checkboxBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxBoxChecked: {
+    backgroundColor: '#0F172A',
+  },
+  checkmarkIcon: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  searchBarWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  searchIconText: {
+    fontSize: 16,
+    marginRight: spacing.xs,
+  },
+  citySearchInput: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    color: '#0F172A',
+  },
+  cityScrollView: {
+    maxHeight: 220,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.xs,
+  },
+  cityListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  cityNameText: {
+    color: '#0F172A',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  dialogFooterRow: {
+    flexDirection: 'row',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  dialogCancelBtn: {
+    flex: 1,
+    backgroundColor: '#8E8E93',
+    paddingVertical: spacing.md,
+    borderRadius: radius.xs,
+    alignItems: 'center',
+  },
+  dialogCancelText: {
+    color: '#FFFFFF',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+  dialogOkBtn: {
+    flex: 1,
+    backgroundColor: '#48BB78',
+    paddingVertical: spacing.md,
+    borderRadius: radius.xs,
+    alignItems: 'center',
+  },
+  dialogOkText: {
+    color: '#FFFFFF',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
 });

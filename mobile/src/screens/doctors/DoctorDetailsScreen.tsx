@@ -120,9 +120,22 @@ export const DoctorDetailsScreen: React.FC<DoctorDetailsScreenProps> = ({
         {/* CTA Button */}
         <View style={styles.ctaContainer}>
           <Button
-            title={geofenceEval.isWithinRadius ? "✓ Start Geofence Verified Visit" : "Start Visit (Flagged Location)"}
-            onPress={() => onStartVisit(doctor, geofenceEval.isWithinRadius, geofenceEval.distanceMeters)}
-            variant={geofenceEval.isWithinRadius ? "primary" : "outline"}
+            title={
+              geofenceEval.isWithinRadius
+                ? "✓ Start Geofence Verified Visit"
+                : `🚫 Out of Range (${Math.round(geofenceEval.distanceMeters)}m Away)`
+            }
+            onPress={() => {
+              if (geofenceEval.isWithinRadius) {
+                onStartVisit(doctor, true, geofenceEval.distanceMeters);
+              } else {
+                Alert.alert(
+                  'Visit Blocked - Out of 100m Range 🚫',
+                  `You are currently ${Math.round(geofenceEval.distanceMeters)}m away from ${doctor.clinicName}.\n\nRepPulse requires you to be physically within the 100-meter clinic perimeter to start and complete this visit.`
+                );
+              }
+            }}
+            variant={geofenceEval.isWithinRadius ? "primary" : "secondary"}
           />
         </View>
       </ScrollView>

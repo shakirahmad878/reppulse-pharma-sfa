@@ -99,6 +99,14 @@ export const VisitExecutionScreen: React.FC<VisitExecutionScreenProps> = ({
   };
 
   const handleSubmitVisit = async () => {
+    if (!isGeofenceVerified || distanceMeters > (doctor.geofenceRadiusMeters || 100)) {
+      Alert.alert(
+        'Visit Blocked - Out of Range 🚫',
+        `Cannot complete DCR call. You are currently ${Math.round(distanceMeters)}m away from ${doctor.clinicName}.\n\nRepPulse requires you to be physically within the 100-meter clinic perimeter to complete this visit.`
+      );
+      return;
+    }
+
     if (selectedProductIds.length === 0) {
       Alert.alert('Selection Required', 'Please select at least 1 product detailed to the doctor.');
       return;

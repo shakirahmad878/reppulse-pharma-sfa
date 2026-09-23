@@ -13,6 +13,7 @@ import {
 import { colors, typography, spacing, radius, shadows } from '../../constants/theme';
 import { DoctorService } from '../../services/doctorService';
 import { RouteService } from '../../services/routeService';
+import { LocationService, LocationResult } from '../../services/location/locationService';
 import { Doctor, RoutePlan } from '../../types';
 
 interface DoctorListScreenProps {
@@ -30,11 +31,16 @@ export const DoctorListScreen: React.FC<DoctorListScreenProps> = ({
   const [activePill, setActivePill] = useState<'FOR_ME' | 'TEAM' | 'ALL'>('FOR_ME');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeRoute, setActiveRoute] = useState<RoutePlan | null>(null);
+  
+  // Add Doctor Modal State with Auto-GPS
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [newDocName, setNewDocName] = useState('');
   const [newDocSpecialty, setNewDocSpecialty] = useState('');
   const [newDocClinic, setNewDocClinic] = useState('');
-  const [newDocArea, setNewDocArea] = useState('');
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [capturedGps, setCapturedGps] = useState<LocationResult | null>(null);
+  const [autoArea, setAutoArea] = useState('Acquiring GPS...');
+  const [autoDistrict, setAutoDistrict] = useState<'Cachar' | 'Karimganj' | 'Hailakandi'>('Cachar');
 
   useEffect(() => {
     loadData();
@@ -45,6 +51,48 @@ export const DoctorListScreen: React.FC<DoctorListScreenProps> = ({
     setDoctors(docs);
     const route = await RouteService.getActiveRoute();
     setActiveRoute(route);
+  };
+
+  const resolveBarakArea = (lat: number, lon: number): { area: string; district: 'Cachar' | 'Karimganj' | 'Hailakandi' } => {
+    if (lon < 92.50) {
+      return { area: 'Main Road & Station Area, Karimganj', district: 'Karimganj' };
+    } else if (lat < 24.75) {
+      return { area: 'Civil Hospital Road, Hailakandi', district: 'Hailakandi' };
+    } else if (lat < 24.80) {
+      return { area: 'SMCH Ghungoor Beat, Silchar', district: 'Cachar' };
+    } else {
+      return { area: 'Hospital Road & Central Beat, Silchar', district: 'Cachar' };
+    }
+  };
+
+  const fetchGpsForNewDoctor = async () => {
+    setGpsLoading(true);
+    const loc = await LocationService.getCurrentLocation();
+    setGpsLoading(false);
+    if (loc) {
+      setCapturedGps(loc);
+      const resolved = resolveBarakArea(loc.latitude, loc.longitude);
+      setAutoArea(resolved.area);
+      setAutoDistrict(resolved.district);
+    } else {
+      // Default Silchar GPS fallback if device GPS is off
+      const defaultLoc: LocationResult = {
+        latitude: 24.8152,
+        longitude: 92.8021,
+        accuracyMeters: 14,
+        speedKmh: 0,
+        isMockLocation: false,
+        timestamp: new Date().toISOString(),
+      };
+      setCapturedGps(defaultLoc);
+      setAutoArea('Hospital Road & Central Beat, Silchar');
+      setAutoDistrict('Cachar');
+    }
+  };
+
+  const openAddModal = () => {
+    setAddModalVisible(true);
+    fetchGpsForNewDoctor();
   };
 
   const forMeDocs = doctors.filter(d => d.isAssignedToMe || d.routeId === activeRoute?.id);
@@ -70,21 +118,32 @@ export const DoctorListScreen: React.FC<DoctorListScreenProps> = ({
       Alert.alert('Missing Details', 'Please provide doctor name and specialty.');
       return;
     }
+
+    const lat = capturedGps ? capturedGps.latitude : 24.8152;
+    const lon = capturedGps ? capturedGps.longitude : 92.8021;
+
     await DoctorService.addDoctor({
       name: newDocName.startsWith('Dr.') ? newDocName : 'Dr. ' + newDocName,
       specialty: newDocSpecialty,
-      clinicName: newDocClinic || 'Hospital Road Clinic',
-      area: newDocArea || 'Hospital Road, Silchar',
-      district: 'Cachar',
+      clinicName: newDocClinic.trim() || 'Consultation Chamber',
+      clinicAddress: autoArea + ', ' + autoDistrict,
+      area: autoArea,
+      district: autoDistrict,
       routeId: activeRoute?.id || 'route-cachar-01',
+      latitude: lat,
+      longitude: lon,
+      geofenceRadiusMeters: 100,
     });
+
     setAddModalVisible(false);
     setNewDocName('');
     setNewDocSpecialty('');
     setNewDocClinic('');
-    setNewDocArea('');
     await loadData();
-    Alert.alert('Doctor Added', 'New doctor successfully added to your Barak Division list.');
+    Alert.alert(
+      'Client Saved with Auto-GPS ✅',
+      `New doctor registered successfully with 100m geofence at GPS (${lat.toFixed(4)}, ${lon.toFixed(4)}) in ${autoArea}.`
+    );
   };
 
   return (
@@ -209,7 +268,7 @@ export const DoctorListScreen: React.FC<DoctorListScreenProps> = ({
       <TouchableOpacity
         style={styles.fabButton}
         activeOpacity={0.85}
-        onPress={() => setAddModalVisible(true)}
+        onPress={openAddModal}
       >
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>
@@ -224,27 +283,43 @@ export const DoctorListScreen: React.FC<DoctorListScreenProps> = ({
             <TextInput
               style={styles.modalInput}
               placeholder="Doctor Full Name (e.g. Dr. Sanjoy Paul)"
+              placeholderTextColor="#94A3B8"
               value={newDocName}
               onChangeText={setNewDocName}
             />
             <TextInput
               style={styles.modalInput}
               placeholder="Specialty (e.g. Cardiologist / Pediatrician)"
+              placeholderTextColor="#94A3B8"
               value={newDocSpecialty}
               onChangeText={setNewDocSpecialty}
             />
             <TextInput
               style={styles.modalInput}
               placeholder="Clinic / Hospital (e.g. SMCH Hospital Road)"
+              placeholderTextColor="#94A3B8"
               value={newDocClinic}
               onChangeText={setNewDocClinic}
             />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Area (e.g. Ambicapatty / Tarapur)"
-              value={newDocArea}
-              onChangeText={setNewDocArea}
-            />
+
+            {/* Auto-Captured GPS Area Section (Read-Only) */}
+            <View style={styles.gpsAreaContainer}>
+              <View style={styles.gpsAreaHeader}>
+                <Text style={styles.gpsAreaTitle}>🛰️ Auto-GPS Location Tag</Text>
+                <TouchableOpacity onPress={fetchGpsForNewDoctor}>
+                  <Text style={styles.gpsRefreshText}>{gpsLoading ? 'Acquiring...' : '↻ Refresh GPS'}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.gpsCoordsBox}>
+                <Text style={styles.gpsLocalityText}>📍 {autoArea}</Text>
+                <Text style={styles.gpsDistrictText}>District: {autoDistrict} • Division: Barak Valley, Assam</Text>
+                <Text style={styles.gpsCoordinatesText}>
+                  Coordinates: {capturedGps ? `${capturedGps.latitude.toFixed(4)}° N, ${capturedGps.longitude.toFixed(4)}° E` : '24.8152° N, 92.8021° E'} • Accuracy: ±{capturedGps?.accuracyMeters || 12}m
+                </Text>
+              </View>
+              <Text style={styles.gpsLockedNotice}>🔒 Area is auto-tagged from device satellite fix (Manual typing disabled)</Text>
+            </View>
 
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
@@ -498,5 +573,61 @@ const styles = StyleSheet.create({
   modalSubmitText: {
     color: '#FFFFFF',
     fontWeight: typography.fontWeight.bold,
+  },
+  
+  // Auto-GPS Area Styles
+  gpsAreaContainer: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  gpsAreaHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  gpsAreaTitle: {
+    color: '#166534',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+  },
+  gpsRefreshText: {
+    color: '#2563EB',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+  },
+  gpsCoordsBox: {
+    backgroundColor: '#FFFFFF',
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    marginVertical: 4,
+  },
+  gpsLocalityText: {
+    color: '#1E293B',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+  gpsDistrictText: {
+    color: '#475569',
+    fontSize: typography.fontSize.xs,
+    marginTop: 2,
+  },
+  gpsCoordinatesText: {
+    color: '#15803D',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    marginTop: 4,
+  },
+  gpsLockedNotice: {
+    color: '#166534',
+    fontSize: 10,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });

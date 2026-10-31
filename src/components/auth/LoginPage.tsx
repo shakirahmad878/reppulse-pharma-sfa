@@ -50,7 +50,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, users, onO
       {/* Link to Public Website (External, opens in new tab) */}
       <div className="absolute top-6 left-6 z-20">
         <a
-          href="https://shakirahmad878.github.io/pharma-assam-website/"
+          href="https://nlcl.in/"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 bg-white hover:bg-[#F1F6F8] text-[#10243A] border border-[#DCE4EB] px-3.5 py-2 rounded-xl text-xs font-semibold shadow-2xs transition-colors cursor-pointer"

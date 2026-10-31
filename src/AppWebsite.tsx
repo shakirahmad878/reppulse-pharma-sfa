@@ -15,7 +15,7 @@ import { PMSidebarNav } from './components/PMSidebarNav';
 import { PRODUCTS } from './data/products';
 import { Product, ProductCategory } from './types';
 
-const SFA_PORTAL_URL = 'https://shakirahmad878.github.io/reppulse-pharma-sfa/';
+const SFA_PORTAL_URL = 'https://reppulse.nlcl.in/';
 
 export default function AppWebsite() {
   const [activePublicSection, setActivePublicSection] = useState<string>('home');

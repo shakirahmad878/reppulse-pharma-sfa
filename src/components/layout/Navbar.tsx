@@ -83,7 +83,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           
           {/* External Link to Public Corporate Site (Opens in new tab, never disrupts SFA session) */}
           <a
-            href="https://shakirahmad878.github.io/pharma-assam-website/"
+            href="https://nlcl.in/"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#182F49] hover:bg-[#203D5E] border border-slate-700 text-slate-200 transition-all cursor-pointer"

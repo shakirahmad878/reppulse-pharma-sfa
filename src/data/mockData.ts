@@ -45,7 +45,7 @@ export const INITIAL_USERS: User[] = [
     role: 'DIRECTOR',
     phone: '6900700102',
     companyId: 'comp-01',
-    companyName: 'Pappu Da Company / Pharma Assam',
+    companyName: 'New Life Care Laboratories Pvt. Ltd.',
     territoryId: 'terr-cachar-01',
     territoryName: 'Silchar Regional HQ',
     employeeCode: 'NLCL-0001',
@@ -73,7 +73,7 @@ export const INITIAL_USERS: User[] = [
     role: 'HR_MANAGER',
     phone: '9101494287',
     companyId: 'comp-01',
-    companyName: 'Pappu Da Company / Pharma Assam',
+    companyName: 'New Life Care Laboratories Pvt. Ltd.',
     territoryId: 'terr-cachar-01',
     territoryName: 'Silchar Corporate HQ',
     employeeCode: 'NLCL-0002',
@@ -101,7 +101,7 @@ export const INITIAL_USERS: User[] = [
     role: 'REGIONAL_MANAGER',
     phone: '8099139305',
     companyId: 'comp-01',
-    companyName: 'Pappu Da Company / Pharma Assam',
+    companyName: 'New Life Care Laboratories Pvt. Ltd.',
     territoryId: 'terr-cachar-01',
     territoryName: 'Silchar Regional HQ',
     employeeCode: 'NLCL-0003',
@@ -129,7 +129,7 @@ export const INITIAL_USERS: User[] = [
     role: 'MEDICAL_REP',
     phone: '9864378424',
     companyId: 'comp-01',
-    companyName: 'Pappu Da Company / Pharma Assam',
+    companyName: 'New Life Care Laboratories Pvt. Ltd.',
     territoryId: 'terr-karimganj-01',
     territoryName: 'Karimganj HQ',
     employeeCode: 'NLCL-0004',
@@ -157,7 +157,7 @@ export const INITIAL_USERS: User[] = [
     role: 'MEDICAL_REP',
     phone: '9394831412',
     companyId: 'comp-01',
-    companyName: 'Pappu Da Company / Pharma Assam',
+    companyName: 'New Life Care Laboratories Pvt. Ltd.',
     territoryId: 'terr-cachar-01',
     territoryName: 'Silchar HQ',
     employeeCode: 'NLCL-0005',
@@ -283,7 +283,7 @@ export const INITIAL_CHEMISTS: Chemist[] = [
     associatedDoctors: [],
     averageMonthlyTurnover: 450000,
     companyId: 'comp-01',
-    companyName: 'Pappu Da Company / Pharma Assam'
+    companyName: 'New Life Care Laboratories Pvt. Ltd.'
   },
   {
     id: 'firm-sil-002',
@@ -299,7 +299,7 @@ export const INITIAL_CHEMISTS: Chemist[] = [
     associatedDoctors: [],
     averageMonthlyTurnover: 320000,
     companyId: 'comp-01',
-    companyName: 'Pappu Da Company / Pharma Assam'
+    companyName: 'New Life Care Laboratories Pvt. Ltd.'
   },
   {
     id: 'firm-kxj-001',
@@ -315,7 +315,7 @@ export const INITIAL_CHEMISTS: Chemist[] = [
     associatedDoctors: [],
     averageMonthlyTurnover: 500000,
     companyId: 'comp-01',
-    companyName: 'Pappu Da Company / Pharma Assam'
+    companyName: 'New Life Care Laboratories Pvt. Ltd.'
   },
   {
     id: 'firm-hkd-001',
@@ -331,7 +331,7 @@ export const INITIAL_CHEMISTS: Chemist[] = [
     associatedDoctors: [],
     averageMonthlyTurnover: 380000,
     companyId: 'comp-01',
-    companyName: 'Pappu Da Company / Pharma Assam'
+    companyName: 'New Life Care Laboratories Pvt. Ltd.'
   }
 ];
 export const INITIAL_STOCKISTS: Stockist[] = [];

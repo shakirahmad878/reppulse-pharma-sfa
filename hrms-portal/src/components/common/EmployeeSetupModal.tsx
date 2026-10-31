@@ -36,7 +36,7 @@ export const EmployeeSetupModal: React.FC<EmployeeSetupModalProps> = ({
   const [workMode, setWorkMode] = useState<WorkMode>('FIELD_EXECUTIVE');
   const [designation, setDesignation] = useState('Senior Territory Sales Specialist');
   const [department, setDepartment] = useState('Field Sales & Distribution');
-  const [organizationUnit, setOrganizationUnit] = useState('Pappu Da Company > Pharmaceuticals');
+  const [organizationUnit, setOrganizationUnit] = useState('New Life Care Laboratories Pvt. Ltd. > Pharmaceuticals');
   const [locationHierarchy, setLocationHierarchy] = useState('India > Assam > Silchar > Central Hub');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -57,7 +57,7 @@ export const EmployeeSetupModal: React.FC<EmployeeSetupModalProps> = ({
       designation: designation.trim() || 'Executive',
       grade: role === 'HR_SUPER_ADMIN' ? 'L6 | Executive' : 'B1 | Lead',
       department: department.trim() || 'Operations',
-      organizationUnit: organizationUnit.trim() || 'Pappu Da Company',
+      organizationUnit: organizationUnit.trim() || 'New Life Care Laboratories Pvt. Ltd.',
       locationHierarchy: locationHierarchy.trim() || 'Silchar, Assam',
       l1Manager: { name: l1ManagerName.trim() || 'Director', code: l1ManagerCode.trim() || 'MGR-01' },
       l2Manager: { name: 'Managing Director', code: 'MD-01' },

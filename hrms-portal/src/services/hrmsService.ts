@@ -130,7 +130,7 @@ export class HrmsService {
             designation,
             grade,
             department: isCEO || isHRAdmin ? 'Corporate Leadership & Operations' : 'Pharmaceutical Field Sales & Distribution',
-            organizationUnit: isCEO ? 'Pappu Da Company > Executive Board' : (isHRAdmin ? 'Pappu Da Company > People Operations' : 'Pappu Da Company > Field Sales'),
+            organizationUnit: isCEO ? 'New Life Care Laboratories Pvt. Ltd. > Executive Board' : (isHRAdmin ? 'New Life Care Laboratories Pvt. Ltd. > People Operations' : 'New Life Care Laboratories Pvt. Ltd. > Field Sales'),
             locationHierarchy: (e.territory || e.headquarter || 'India > Assam > Silchar > Regional HQ').replace(/\bTripura\b/g, 'Agartala, Dharmanagar'),
             l1Manager,
             l2Manager: { name: isCEO ? 'Board of Directors' : 'Samsuj Sadiol (Director)', code: isCEO ? 'BOD' : 'NLCL-0001' },

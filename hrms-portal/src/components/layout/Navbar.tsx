@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { HrmsUser } from '../../types';
 import { 
   Search, 
@@ -48,6 +48,19 @@ export const Navbar: React.FC<NavbarProps> = ({
   isDatabaseConnected = true,
   isServerConnected = false
 }) => {
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const modules: { id: ActiveModule; label: string }[] = [
     { id: 'HOME', label: 'HOME' },
     { id: 'HRIS', label: 'HRIS' },
@@ -126,50 +139,63 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {/* User Persona Switcher */}
-          <div className="relative group ml-1">
-            <div className="flex items-center gap-2 cursor-pointer p-1 rounded-full hover:bg-slate-100 transition-colors">
+          <div className="relative ml-1" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen(prev => !prev)}
+              className="flex items-center gap-2 cursor-pointer p-1 rounded-full hover:bg-slate-100 transition-colors focus:outline-none"
+              aria-label="Toggle user profile menu"
+            >
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs border-2 border-white">
                 {currentUser.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isProfileOpen ? 'rotate-180 text-sky-600' : ''}`} />
+            </button>
 
             {/* Persona Switcher Dropdown */}
-            <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-2xl py-2 hidden group-hover:block z-50">
-              <div className="px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
-                <span>Active Profile</span>
-                <span className="text-[9px] text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded font-mono">
-                  {currentUser.workMode === 'OFFICE_STAFF' ? 'Office' : 'Field'}
-                </span>
-              </div>
-              {users.map(u => (
-                <button
-                  key={u.id}
-                  onClick={() => onSelectUser(u)}
-                  className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-sky-50 transition-colors cursor-pointer ${
-                    u.id === currentUser.id ? 'bg-sky-50/70 text-sky-700 font-bold' : 'text-slate-700'
-                  }`}
-                >
-                  <div>
-                    <div className="font-semibold">{u.name}</div>
-                    <div className="text-[10px] text-slate-400">{u.designation} ({u.employeeCode})</div>
-                  </div>
-                  {u.id === currentUser.id && (
-                    <span className="w-2 h-2 rounded-full bg-sky-600"></span>
-                  )}
-                </button>
-              ))}
+            {isProfileOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                  <span>Active Profile</span>
+                  <span className="text-[9px] text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded font-mono">
+                    {currentUser.workMode === 'OFFICE_STAFF' ? 'Office' : 'Field'}
+                  </span>
+                </div>
+                {users.map(u => (
+                  <button
+                    key={u.id}
+                    onClick={() => {
+                      onSelectUser(u);
+                      setIsProfileOpen(false);
+                    }}
+                    className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-sky-50 transition-colors cursor-pointer ${
+                      u.id === currentUser.id ? 'bg-sky-50/70 text-sky-700 font-bold' : 'text-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold">{u.name}</div>
+                      <div className="text-[10px] text-slate-400">{u.designation} ({u.employeeCode})</div>
+                    </div>
+                    {u.id === currentUser.id && (
+                      <span className="w-2 h-2 rounded-full bg-sky-600"></span>
+                    )}
+                  </button>
+                ))}
 
-              <div className="pt-1.5 mt-1 border-t border-slate-100 px-2">
-                <button
-                  onClick={onOpenAddEmployee}
-                  className="w-full text-left px-2.5 py-1.5 text-xs text-sky-600 hover:bg-sky-50 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Add Employee Profile</span>
-                </button>
+                <div className="pt-1.5 mt-1 border-t border-slate-100 px-2">
+                  <button
+                    onClick={() => {
+                      onOpenAddEmployee();
+                      setIsProfileOpen(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 text-xs text-sky-600 hover:bg-sky-50 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add Employee Profile</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
         </div>

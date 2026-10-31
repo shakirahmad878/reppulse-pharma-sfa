@@ -146,6 +146,7 @@ export interface ReimbursementClaim {
   items: ClaimItem[];
   status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'DISBURSED';
   appliedDate: string;
+  approverComments?: string;
 }
 
 export interface EarningsBreakdown {

@@ -579,6 +579,17 @@ export class HrmsService {
     return newClaim;
   }
 
+  static updateClaimStatus(claimId: string, status: 'APPROVED' | 'REJECTED', approverName: string): ReimbursementClaim[] {
+    const list = this.getReimbursementClaims();
+    const updated = list.map(c => c.id === claimId ? {
+      ...c,
+      status,
+      approverComments: `Actioned by ${approverName} on ${new Date().toLocaleDateString('en-GB')}`,
+    } : c);
+    setItem(KEYS.REIMBURSEMENTS, updated);
+    return updated;
+  }
+
   // ==========================================
   // 8. PERFORMANCE GOALS
   // ==========================================

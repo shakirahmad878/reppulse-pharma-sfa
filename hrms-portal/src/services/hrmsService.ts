@@ -125,7 +125,7 @@ export class HrmsService {
             id: e.id,
             name: e.name,
             employeeCode: e.employee_code,
-            email: e.email || `${e.employee_code.toLowerCase()}@pappudacompany.com`,
+            email: e.email || `${e.employee_code.toLowerCase()}@nlcl.in`,
             role,
             designation,
             grade,

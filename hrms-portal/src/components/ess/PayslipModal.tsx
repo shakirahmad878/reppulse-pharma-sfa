@@ -48,7 +48,7 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({ payslip, onClose }) 
               </div>
               <div>
                 <h1 className="text-xl font-black text-slate-900 tracking-tight">
-                  PAPPU DA COMPANY ENTERPRISE HRMS
+                  NEW LIFE CARE LABORATORIES PVT. LTD.
                 </h1>
                 <p className="text-xs text-slate-500">
                   Registered Office: Silchar, Assam 788001 | Central Workforce & Payroll System

@@ -51,7 +51,7 @@ export const EmployeeSetupModal: React.FC<EmployeeSetupModalProps> = ({
     const newUser: HrmsUser = {
       id: `usr-${Date.now()}`,
       name: name.trim(),
-      email: email.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@pappudacompany.com`,
+      email: email.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@nlcl.in`,
       role,
       employeeCode: employeeCode.trim() || `PDC-${Math.floor(100 + Math.random() * 900)}`,
       designation: designation.trim() || 'Executive',
@@ -216,7 +216,7 @@ export const EmployeeSetupModal: React.FC<EmployeeSetupModalProps> = ({
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="e.g. rahul@pappudacompany.com"
+                placeholder="e.g. rahul@nlcl.in"
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500"
               />
             </div>

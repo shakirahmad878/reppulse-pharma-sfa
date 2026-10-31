@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-2 border-t border-slate-800 text-[10px] text-slate-500 text-center">
         {isExpanded ? (
           <div>
-            <p className="font-bold text-slate-300">Pappu Da HRMS</p>
+            <p className="font-bold text-slate-300">New Life Care HRMS</p>
             <p className="text-slate-500 text-[9px] mt-0.5">Enterprise Workforce</p>
           </div>
         ) : (
